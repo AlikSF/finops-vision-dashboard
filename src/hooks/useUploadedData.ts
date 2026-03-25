@@ -1,32 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
+import { get, set, del } from "idb-keyval";
 import { parseCSV, type UserRecord } from "@/data/userData";
 import { toast } from "@/hooks/use-toast";
 
-const STORAGE_KEY = "license-optimizer-data";
-const TIMESTAMP_KEY = "license-optimizer-timestamp";
-
-interface StoredData {
-  users: UserRecord[];
-  timestamp: string;
-}
-
-function loadFromStorage(): StoredData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const ts = localStorage.getItem(TIMESTAMP_KEY);
-    if (raw && ts) {
-      return { users: JSON.parse(raw), timestamp: ts };
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function saveToStorage(users: UserRecord[], timestamp: string) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-  localStorage.setItem(TIMESTAMP_KEY, timestamp);
-}
+const DB_KEY = "license-optimizer-data";
+const TS_KEY = "license-optimizer-timestamp";
 
 export function useUploadedData() {
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -34,24 +12,30 @@ export function useUploadedData() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    const stored = loadFromStorage();
-    if (stored) {
-      setUsers(stored.users);
-      setUploadTimestamp(stored.timestamp);
-    }
+    (async () => {
+      try {
+        const [stored, ts] = await Promise.all([get<UserRecord[]>(DB_KEY), get<string>(TS_KEY)]);
+        if (stored && ts) {
+          setUsers(stored);
+          setUploadTimestamp(ts);
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   const handleFileUpload = useCallback((file: File) => {
     setIsProcessing(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
         const parsed = parseCSV(text);
         const ts = new Date().toISOString();
         setUsers(parsed);
         setUploadTimestamp(ts);
-        saveToStorage(parsed, ts);
+        await Promise.all([set(DB_KEY, parsed), set(TS_KEY, ts)]);
         toast({
           title: "Data uploaded successfully",
           description: `${parsed.length} user records loaded.`,
@@ -77,11 +61,10 @@ export function useUploadedData() {
     reader.readAsText(file);
   }, []);
 
-  const clearData = useCallback(() => {
+  const clearData = useCallback(async () => {
     setUsers([]);
     setUploadTimestamp(null);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TIMESTAMP_KEY);
+    await Promise.all([del(DB_KEY), del(TS_KEY)]);
   }, []);
 
   return { users, uploadTimestamp, isProcessing, handleFileUpload, clearData };

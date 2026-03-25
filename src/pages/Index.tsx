@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { Search, Users, Ghost, AlertTriangle, DollarSign, Upload, FileDown, Activity, TrendingUp } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -80,12 +80,15 @@ function EmptyState() {
   );
 }
 
+const ROWS_PER_PAGE = 50;
+
 const Index = () => {
   const { users, uploadTimestamp, isProcessing, handleFileUpload, clearData } = useUploadedData();
   const [search, setSearch] = useState("");
   const [selectedProfile, setSelectedProfile] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedLicense, setSelectedLicense] = useState("all");
+  const [currentPage, setCurrentPage] = useState(0);
 
   const profiles = useMemo(() => getUniqueProfiles(users), [users]);
   const roles = useMemo(() => getUniqueRoles(users), [users]);
@@ -103,6 +106,11 @@ const Index = () => {
       return matchProfile && matchRole && matchLicense && matchSearch;
     });
   }, [users, search, selectedProfile, selectedRole, selectedLicense]);
+
+  useEffect(() => { setCurrentPage(0); }, [filteredUsers]);
+
+  const totalPages = Math.ceil(filteredUsers.length / ROWS_PER_PAGE);
+  const paginatedUsers = filteredUsers.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
 
   const kpis = useMemo(() => computeKPIs(filteredUsers), [filteredUsers]);
 
@@ -433,7 +441,12 @@ const Index = () => {
           {/* Data Table */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">User Licenses</CardTitle>
+              <div className="space-y-1">
+                <CardTitle className="text-base">User Licenses</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Showing {Math.min(currentPage * ROWS_PER_PAGE + 1, filteredUsers.length)}–{Math.min((currentPage + 1) * ROWS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length.toLocaleString()} records
+                </p>
+              </div>
               <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
@@ -453,14 +466,14 @@ const Index = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.length === 0 ? (
+                  {paginatedUsers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No users found matching your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredUsers.map((u) => {
+                    paginatedUsers.map((u) => {
                       const days = getDaysSinceLogin(u.lastLoginDate);
                       const status = getLoginStatus(days);
                       return (
@@ -478,6 +491,19 @@ const Index = () => {
                   )}
                 </TableBody>
               </Table>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">Page {currentPage + 1} of {totalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
