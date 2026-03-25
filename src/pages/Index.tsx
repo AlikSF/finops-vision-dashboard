@@ -441,7 +441,12 @@ const Index = () => {
           {/* Data Table */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">User Licenses</CardTitle>
+              <div className="space-y-1">
+                <CardTitle className="text-base">User Licenses</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Showing {Math.min(currentPage * ROWS_PER_PAGE + 1, filteredUsers.length)}–{Math.min((currentPage + 1) * ROWS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length.toLocaleString()} records
+                </p>
+              </div>
               <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
@@ -461,14 +466,14 @@ const Index = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.length === 0 ? (
+                  {paginatedUsers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No users found matching your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredUsers.map((u) => {
+                    paginatedUsers.map((u) => {
                       const days = getDaysSinceLogin(u.lastLoginDate);
                       const status = getLoginStatus(days);
                       return (
@@ -486,6 +491,19 @@ const Index = () => {
                   )}
                 </TableBody>
               </Table>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">Page {currentPage + 1} of {totalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
