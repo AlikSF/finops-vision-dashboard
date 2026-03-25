@@ -66,7 +66,23 @@ export function useDataStore() {
   // Enriched users
   const enrichedUsers = useMemo(() => {
     if (users.length === 0) return [];
-    return joinData(users, loginHistory, pslAssignments, pslPool, categoryRules, teamMappings);
+    const result = joinData(users, loginHistory, pslAssignments, pslPool, categoryRules, teamMappings);
+    
+    // Debug logging — trace where users end up
+    const licenseBreakdown: Record<string, number> = {};
+    const categoryBreakdown: Record<string, number> = {};
+    const statusBreakdown: Record<string, number> = {};
+    for (const u of result) {
+      licenseBreakdown[u.licenseName] = (licenseBreakdown[u.licenseName] || 0) + 1;
+      categoryBreakdown[u.derivedCategory] = (categoryBreakdown[u.derivedCategory] || 0) + 1;
+      statusBreakdown[u.usageStatus] = (statusBreakdown[u.usageStatus] || 0) + 1;
+    }
+    console.log(`[DataStore] Total enriched users: ${result.length}`);
+    console.log(`[DataStore] By license:`, licenseBreakdown);
+    console.log(`[DataStore] By category:`, categoryBreakdown);
+    console.log(`[DataStore] By status:`, statusBreakdown);
+    
+    return result;
   }, [users, loginHistory, pslAssignments, pslPool, categoryRules, teamMappings]);
 
   const uploadFile = useCallback(async (file: File, forcedType?: FileType) => {

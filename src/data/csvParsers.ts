@@ -22,8 +22,9 @@ function findCol(row: Record<string, string>, ...candidates: string[]): string {
 }
 
 function hasCol(headers: string[], ...candidates: string[]): boolean {
-  const lower = headers.map(h => h.toLowerCase());
-  return candidates.some(c => lower.includes(c.toLowerCase()));
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[_\s.]+/g, "");
+  const normalizedHeaders = headers.map(normalize);
+  return candidates.some(c => normalizedHeaders.includes(normalize(c)));
 }
 
 export function detectFileType(csvText: string): FileType | null {
