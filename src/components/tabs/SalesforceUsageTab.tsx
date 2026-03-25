@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -33,6 +35,7 @@ interface Props {
 
 export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistory, hasLoginHistory }: Props) {
   const [includeSystem, setIncludeSystem] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   const safeUsers = users || [];
   const safeAll = allSfUsers || [];
@@ -94,9 +97,12 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
     .sort((a, b) => b.value - a.value);
 
   // Most active users
-  const topUsers = [...displayUsers]
-    .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0))
-    .slice(0, 10);
+  const allSorted = useMemo(() => {
+    const q = userSearch.toLowerCase();
+    return [...displayUsers]
+      .filter(u => !q || u.name.toLowerCase().includes(q) || u.profileName?.toLowerCase().includes(q) || u.roleName?.toLowerCase().includes(q))
+      .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0));
+  }, [displayUsers, userSearch]);
 
   return (
     <div className="space-y-4">
@@ -175,38 +181,56 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
             </Card>
           </div>
 
-          {/* Most active */}
-          {topUsers.length > 0 && (
-            <Card className="shadow-sm mt-6">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Most Active Salesforce Users (30d)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-md overflow-auto max-h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Profile</TableHead>
-                        <TableHead>Team/Function</TableHead>
-                        <TableHead className="text-right">Logins (30d)</TableHead>
+          {/* Full user list */}
+          <Card className="shadow-sm mt-6">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm font-semibold">All Salesforce Users ({allSorted.length})</CardTitle>
+              <Input
+                placeholder="Search by name, profile or role…"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="max-w-xs h-8 text-xs"
+              />
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-md overflow-auto max-h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Profile</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Team/Function</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead className="text-right">Logins (30d)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allSorted.map(u => (
+                      <TableRow key={u.id}>
+                        <TableCell className="text-xs font-medium">{u.name}</TableCell>
+                        <TableCell className="text-xs">{u.profileName}</TableCell>
+                        <TableCell className="text-xs">{u.roleName || "—"}</TableCell>
+                        <TableCell className="text-xs">{u.derivedTeamFunction}</TableCell>
+                        <TableCell className="text-xs">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0"
+                            style={{ borderColor: STATUS_COLORS[u.usageStatus], color: STATUS_COLORS[u.usageStatus] }}
+                          >
+                            {u.usageStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">{u.lastLoginDate ? new Date(u.lastLoginDate).toLocaleDateString() : "Never"}</TableCell>
+                        <TableCell className="text-xs text-right">{u.logins30d}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {topUsers.map(u => (
-                        <TableRow key={u.id}>
-                          <TableCell className="text-xs font-medium">{u.name}</TableCell>
-                          <TableCell className="text-xs">{u.profileName}</TableCell>
-                          <TableCell className="text-xs">{u.derivedTeamFunction}</TableCell>
-                          <TableCell className="text-xs text-right">{u.logins30d}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="insights">
