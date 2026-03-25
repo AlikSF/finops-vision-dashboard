@@ -88,12 +88,12 @@ export function parseCSV(csvText: string): UserRecord[] {
   const colName = findHeader(headers, "Name", "Full Name", "FullName");
   const colEmail = findHeader(headers, "Email", "EmailAddress", "Email Address");
   const colUsername = findHeader(headers, "Username", "User Name");
-  const colProfile = findHeader(headers, "Profile Name", "ProfileName", "Profile");
-  const colLicense = findHeader(headers, "License Name", "LicenseName", "License", "License Type");
-  const colDepartment = findHeader(headers, "Department", "Dept");
-  const colActive = findHeader(headers, "Is Active", "IsActive", "Active");
-  const colLastLogin = findHeader(headers, "Last Login Date", "LastLoginDate", "Last Login", "LastLogin");
-  const colFedId = findHeader(headers, "Federation Id", "FederationId", "Federation ID");
+  const colProfile = findHeader(headers, "Profile.Name", "Profile Name", "ProfileName", "Profile");
+  const colLicense = findHeader(headers, "Profile.UserLicense.Name", "License Name", "LicenseName", "License", "License Type");
+  const colDepartment = findHeader(headers, "UserRole.Name", "Department", "Dept");
+  const colActive = findHeader(headers, "IsActive", "Is Active", "Active");
+  const colLastLogin = findHeader(headers, "LastLoginDate", "Last Login Date", "Last Login", "LastLogin");
+  const colFedId = findHeader(headers, "FederationIdentifier", "Federation Id", "FederationId", "Federation ID");
 
   return result.data.map((row, i) => {
     const firstName = (colFirstName ? row[colFirstName] : "") || "";
