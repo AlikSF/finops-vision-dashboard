@@ -1,167 +1,100 @@
 
 
-# Multi-File Salesforce License Optimization Dashboard — Plan
+# Refactor Dashboard into 3 Top-Level Tabs
 
 ## Summary
 
-Complete rebuild of the data layer and dashboard to support 5 CSV files with relational joins, derived user categories, editable classification rules, 6 dashboard tabs, expanded KPIs, and snapshot comparison.
+Replace the current 6 sub-tabs with 3 top-level workspaces: **Salesforce Usage**, **Community / ePortal Usage**, and **License Usage**. Each tab pre-filters data independently. Sidebar filters scope to the active tab.
 
----
-
-## Architecture Overview
+## Architecture
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  Upload Zone (multi-file, per-file type detection)  │
-│  users_master / login_history / license pools / PSL │
-└──────────────────┬──────────────────────────────────┘
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│  Data Engine (useDataStore hook)                    │
-│  - Parse each CSV independently                    │
-│  - Join users ↔ login_history by UserId            │
-│  - Join users ↔ PSL assignments by AssigneeId      │
-│  - Join PSL assignments ↔ PSL pool by LicenseId    │
-│  - Match user license → user_license_pool.Name     │
-│  - Derive User Category from rules                 │
-│  - Save snapshots with timestamps to IndexedDB     │
-└──────────────────┬──────────────────────────────────┘
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│  Dashboard (filters → KPIs → tabs → detail table)  │
-│  Default: Internal Business Users only              │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Top-level Tabs (in Index.tsx)                  │
+│  [Salesforce Usage] [Community/ePortal] [License]│
+└─────────────────────────────────────────────────┘
+         │                  │              │
+         ▼                  ▼              ▼
+   SalesforceUsageTab  CommunityTab   LicenseUsageTab
+   (pre-filtered to    (pre-filtered  (org-level pool
+    licenseName =       to community   data + add-on
+    "Salesforce")       licenses)      adoption detail)
 ```
 
----
+## Changes
 
-## New Files
+### 1. New file: `src/components/tabs/SalesforceUsageTab.tsx`
 
-### 1. `src/data/dataModels.ts` — Interfaces & Types
+- **Props**: `users` (already filtered to Salesforce license), `allSfUsers` (unfiltered SF users for totals), `loginHistory`, `hasLoginHistory`, `licensePool`, `pslPool`
+- **Toggle**: "Include System & Integration" checkbox (default off) — filters out Automated/System and Integration/Technical from charts
+- **KPIs** (9 cards, 3x3 grid):
+  - Total SF Users in Scope | SF License Pool (from licensePool where name="Salesforce") | SF Licenses Used
+  - SF Licenses Available | Active (30d) | At Risk (31-90d)
+  - Ghost (>90d) | Never Used | Reassignment Candidates (Ghost + Never Used, excluding system/integration)
+- **Sub-tabs** within this tab: Overview | By Profile | By Role | By Team/Function | Activity | User Detail
+  - Reuse existing `ProfileAnalysisTab`, `RoleAnalysisTab`, `ActivityAnalysisTab`, `UserDetailTab` components by passing pre-filtered users
+  - Overview: status pie, team/function bar chart, most active users
+  - All charts exclude system/integration unless toggle is on
 
-- `RawUser` — parsed from users_master.csv (id, username, name, email, profileName, userType, roleName, department, licenseName, isActive, lastLoginDate, createdDate, title, etc.)
-- `LoginRecord` — parsed from login_history (userId, loginTime, status, sourceIp, loginType, application)
-- `UserLicensePool` — from user_license_pool (name, totalLicenses, usedLicenses)
-- `PSLPool` — from permission_set_license_pool (id, masterLabel, totalLicenses, usedLicenses)
-- `PSLAssignment` — from permission_set_license_assignments (assigneeId, permissionSetLicenseId)
-- `EnrichedUser` — the joined record: RawUser + loginCounts (7d/30d/90d) + addOnLicenses (string[]) + derivedCategory + usageStatus
-- `CategoryRule` — { id, category, field, operator, value } for editable rules
-- `DataSnapshot` — { id, timestamp, files: record of which files uploaded, enrichedUsers }
+### 2. New file: `src/components/tabs/CommunityUsageTab.tsx`
 
-### 2. `src/data/categoryRules.ts` — User Category Derivation
+- **Props**: `users` (filtered to community licenses), `loginHistory`, `hasLoginHistory`
+- **Pre-filter logic**: licenseName matches "Customer Community Login" or "Customer Community Plus Login"
+- **KPIs** (8 cards):
+  - Total ePortal Users | B2B Users | B2C Users | External/Community Other
+  - Active (30d) | At Risk | Ghost | Never Used
+  - Community Adoption Rate = Active / Total
+- **Charts/tables**:
+  - B2B vs B2C vs Other pie chart
+  - Status distribution pie
+  - Usage by profile (horizontal bar)
+  - Usage by role if available
+  - Login trend (if login history exists)
+  - User detail table (reuse `UserDetailTab`)
 
-Default rules (evaluated in priority order):
-1. **Automated/System**: name === "Automated Process" OR username matches `/autoproc|noreply|service|sync|bot/i`
-2. **Integration**: profileName matches `/integration/i` OR username/email matches `/integration|api|mulesoft|talend|etl/i`
-3. **Admin**: profileName matches `/administrator|admin/i` (but NOT already Integration)
-4. **External/Community**: profileName matches `/b2c|b2b|customer|portal|community/i` OR userType matches `/customer|partner|community|portal/i`
-5. **Internal Business User**: profileName matches business profiles OR fallback when not matching above categories
-6. **Other**: fallback
+### 3. New file: `src/components/tabs/LicenseUsageTab.tsx`
 
-Export `deriveCategory(user, rules)` function. Rules stored in IndexedDB so user edits persist.
+- **Props**: `users` (all enriched users), `licensePool`, `pslPool`, `pslAssignments`
+- **Section A: Primary License Pool** — table from `licensePool`: Type, Total, Used, Available, Utilization %
+- **Section B: Add-on / PSL Pool** — table from `pslPool`: Name, Total, Used, Available, Utilization %
+- **Section C: Add-on Adoption Detail** — dropdown to select an add-on license (default: first available, highlight CRM Analytics)
+  - For selected add-on: find all users with that add-on in `addOnLicenses`
+  - Show: Total licenses, Assigned, Active assigned, Inactive assigned, Never used assigned, Reassignment candidates
+  - Breakdown tables: by profile, by role, by team/function
 
-### 3. `src/data/dataJoiner.ts` — Join & Enrich Logic
+### 4. Update `src/pages/Index.tsx`
 
-- `joinData(users, loginHistory?, pslAssignments?, pslPool?, userLicensePool?)` → `EnrichedUser[]`
-- For each user: count logins in 7d/30d/90d from login_history
-- For each user: collect add-on license names via PSL assignments → PSL pool lookup
-- Compute usage status: Active (login ≤30d), At Risk (31-90d), Ghost (>90d), Never Used (no lastLoginDate)
-- Match primary license name to user_license_pool for pool utilization stats
+- Replace current 6-tab structure with 3 top-level tabs
+- Pre-compute `sfUsers` = `enrichedUsers.filter(u => u.licenseName === "Salesforce")`
+- Pre-compute `communityUsers` = `enrichedUsers.filter(u => ["Customer Community Login", "Customer Community Plus Login"].includes(u.licenseName))`
+- Apply sidebar filters scoped per tab (filters only apply within the active tab's pre-filtered set)
+- Keep toolbar with CategoryRuleEditor and Save Snapshot
 
-### 4. `src/hooks/useDataStore.ts` — Replace `useUploadedData`
+### 5. Update `src/components/AppSidebar.tsx`
 
-- State: `{ users, loginHistory, pslAssignments, pslPool, userLicensePool, enrichedUsers, snapshots, categoryRules }`
-- `uploadFile(file, fileType)` — parse based on type, store in IndexedDB under keyed slots
-- `recomputeEnrichedUsers()` — runs joins + category derivation whenever any source changes
-- `saveSnapshot()` / `loadSnapshot(id)` / `compareSnapshots(id1, id2)`
-- `updateCategoryRules(rules)` — save to IndexedDB, recompute categories
-- Graceful: if login_history or PSL files not uploaded, enrichedUsers still works with available data
+- Receive `activeTab` prop to scope filter options to the active tab's user set
+- For Salesforce tab: show Category (limited to SF categories), Status, Profile, Role, Department, Add-on filters
+- For Community tab: show Category (B2C/B2B/Other), Status, Profile filters
+- For License tab: hide user-level filters (this tab is org-level)
 
-### 5. `src/components/MultiFileUpload.tsx` — New Upload UI
+### 6. Update `src/components/DashboardLayout.tsx`
 
-- Replace single CSV drop zone with a multi-file upload panel
-- Show 5 file slots: users_master (required), login_history (optional), user_license_pool (optional), psl_pool (optional), psl_assignments (optional)
-- Each slot: drag-drop or click, shows filename + record count + timestamp when uploaded
-- Auto-detect file type from headers (fallback: let user pick)
-- "Clear All" button
+- Pass `activeTab` prop through to sidebar
 
-### 6. `src/components/CategoryRuleEditor.tsx` — Editable Rules UI
+### 7. Files to remove or deprecate
 
-- Dialog/drawer showing current category rules as a table
-- Each rule: Category, Field (profileName/username/email/name/userType), Operator (contains/equals/regex), Value
-- Add/edit/delete/reorder rules
-- "Reset to Defaults" button
-- Changes trigger re-derivation of all user categories
-
-### 7. `src/components/tabs/` — Tab Components (split Index.tsx)
-
-Split the massive Index.tsx into focused tab components:
-- `OverviewTab.tsx` — KPI cards + pie chart + activity bar chart
-- `LicenseAnalysisTab.tsx` — Primary license pool utilization, add-on license utilization, waste by license type
-- `ProfileAnalysisTab.tsx` — existing profile charts + summary table
-- `RoleAnalysisTab.tsx` — existing role charts + summary table
-- `ActivityAnalysisTab.tsx` — Login frequency heatmap, 7d/30d/90d activity breakdown, login type distribution (from login_history)
-- `UserDetailTab.tsx` — Full paginated table with all fields
-
----
-
-## Dashboard Changes (`src/pages/Index.tsx`)
-
-### Filters (sidebar)
-Add to existing sidebar:
-- **User Category** — multi-select: Automated/System, Integration, Admin, External/Community, Internal Business User, Other
-- **Usage Status** — multi-select: Active, At Risk, Ghost, Never Used
-- **Department** — dropdown
-- **Add-on License Type** — dropdown (from PSL pool names)
-- Keep existing: Profile, Role, Primary License Type
-
-Default filter: User Category = "Internal Business User"
-
-### KPI Cards (3 rows of 3 = 9 cards)
-Row 1: Total Active Users | Active in Last 30 Days | At Risk Users
-Row 2: Ghost Users | Never Used Users | Utilization Rate
-Row 3: Total Primary Licenses (from pool) | Used Primary Licenses (from pool) | Est. Waste by License Type
-
-### Tabs
-Overview | License Analysis | Profile Analysis | Role Analysis | Activity Analysis | User Detail
-
-### Waste Calculation
-- Exclude Automated/System and Integration categories by default
-- Separate External/Community from Internal Business Users
-- Show waste breakdown per license type using pool data
-
-### User Detail Tab
-Columns: Name, Username, Email, Profile, Role, UserType, Primary License, Add-on Licenses, Department, CreatedDate, LastLoginDate, Category, Usage Status, Logins (7d/30d/90d)
-
----
-
-## Snapshot Comparison
-
-- Each upload set saved as a dated snapshot in IndexedDB
-- Dropdown to select previous snapshot
-- When comparing: show delta badges on KPIs (e.g., "+5 ghost users since last snapshot")
-- Simple before/after view, not a full diff
-
----
+- `src/components/tabs/OverviewTab.tsx` — logic absorbed into SalesforceUsageTab
+- `src/components/tabs/LicenseAnalysisTab.tsx` — replaced by LicenseUsageTab
+- Keep `ProfileAnalysisTab`, `RoleAnalysisTab`, `ActivityAnalysisTab`, `UserDetailTab` as reusable sub-components
 
 ## Files Modified
-1. `src/data/dataModels.ts` — new
-2. `src/data/categoryRules.ts` — new
-3. `src/data/dataJoiner.ts` — new
-4. `src/hooks/useDataStore.ts` — new (replaces useUploadedData)
-5. `src/components/MultiFileUpload.tsx` — new
-6. `src/components/CategoryRuleEditor.tsx` — new
-7. `src/components/tabs/OverviewTab.tsx` — new
-8. `src/components/tabs/LicenseAnalysisTab.tsx` — new
-9. `src/components/tabs/ProfileAnalysisTab.tsx` — new
-10. `src/components/tabs/RoleAnalysisTab.tsx` — new
-11. `src/components/tabs/ActivityAnalysisTab.tsx` — new
-12. `src/components/tabs/UserDetailTab.tsx` — new
-13. `src/pages/Index.tsx` — rewrite to use new store + tabs
-14. `src/components/AppSidebar.tsx` — add new filter dropdowns
-15. `src/components/DashboardLayout.tsx` — pass new filter props
-16. `src/data/userData.ts` — keep parseCSV helpers, add new parsers for other file types
 
-## Files Removed
-- `src/hooks/useUploadedData.ts` — replaced by useDataStore
+1. `src/components/tabs/SalesforceUsageTab.tsx` — new
+2. `src/components/tabs/CommunityUsageTab.tsx` — new  
+3. `src/components/tabs/LicenseUsageTab.tsx` — new (replaces LicenseAnalysisTab)
+4. `src/pages/Index.tsx` — rewrite tab structure, pre-filter logic
+5. `src/components/AppSidebar.tsx` — add activeTab-aware filter scoping
+6. `src/components/DashboardLayout.tsx` — pass activeTab prop
+7. `src/components/tabs/OverviewTab.tsx` — remove (absorbed)
+8. `src/components/tabs/LicenseAnalysisTab.tsx` — remove (replaced)
 
