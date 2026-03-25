@@ -14,6 +14,8 @@ export interface UserRecord {
   isActive: boolean;
   lastLoginDate: string | null;
   federationId: string;
+  roleName: string;
+  createdDate: string | null;
 }
 
 const COST_PER_LICENSE = 150;
@@ -29,28 +31,50 @@ export function getLoginStatus(daysSince: number | null): "ghost" | "at-risk" | 
   return "active";
 }
 
+export function getLicenseAgeDays(createdDate: string | null): number | null {
+  if (!createdDate) return null;
+  return differenceInDays(new Date(), new Date(createdDate));
+}
+
+export function formatLicenseAge(createdDate: string | null): string {
+  const days = getLicenseAgeDays(createdDate);
+  if (days === null) return "Unknown";
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  const years = Math.floor(days / 365);
+  const months = Math.floor((days % 365) / 30);
+  return months > 0 ? `${years}y ${months}mo` : `${years}y`;
+}
+
 export interface DashboardKPIs {
   totalLicenses: number;
+  activeUsers: number;
   ghostUsers: number;
   atRiskUsers: number;
+  utilizationRate: number;
   wastedSpend: number;
 }
 
 export function computeKPIs(filteredUsers: UserRecord[]): DashboardKPIs {
   let ghostUsers = 0;
   let atRiskUsers = 0;
+  let activeUsers = 0;
 
   filteredUsers.forEach((u) => {
     const days = getDaysSinceLogin(u.lastLoginDate);
     const status = getLoginStatus(days);
     if (status === "ghost") ghostUsers++;
     else if (status === "at-risk") atRiskUsers++;
+    else activeUsers++;
   });
 
+  const total = filteredUsers.length;
   return {
-    totalLicenses: filteredUsers.length,
+    totalLicenses: total,
+    activeUsers,
     ghostUsers,
     atRiskUsers,
+    utilizationRate: total > 0 ? Math.round((activeUsers / total) * 100) : 0,
     wastedSpend: ghostUsers * COST_PER_LICENSE,
   };
 }
@@ -61,6 +85,14 @@ export function getUniqueDepartments(data: UserRecord[]): string[] {
 
 export function getUniqueLicenses(data: UserRecord[]): string[] {
   return [...new Set(data.map((u) => u.licenseName).filter(Boolean))];
+}
+
+export function getUniqueProfiles(data: UserRecord[]): string[] {
+  return [...new Set(data.map((u) => u.profileName).filter(Boolean))];
+}
+
+export function getUniqueRoles(data: UserRecord[]): string[] {
+  return [...new Set(data.map((u) => u.roleName).filter(Boolean))];
 }
 
 // Flexible column mapping
@@ -90,10 +122,12 @@ export function parseCSV(csvText: string): UserRecord[] {
   const colUsername = findHeader(headers, "Username", "User Name");
   const colProfile = findHeader(headers, "Profile.Name", "Profile Name", "ProfileName", "Profile");
   const colLicense = findHeader(headers, "Profile.UserLicense.Name", "License Name", "LicenseName", "License", "License Type");
-  const colDepartment = findHeader(headers, "UserRole.Name", "Department", "Dept");
+  const colDepartment = findHeader(headers, "Department", "Dept");
   const colActive = findHeader(headers, "IsActive", "Is Active", "Active");
   const colLastLogin = findHeader(headers, "LastLoginDate", "Last Login Date", "Last Login", "LastLogin");
   const colFedId = findHeader(headers, "FederationIdentifier", "Federation Id", "FederationId", "Federation ID");
+  const colRole = findHeader(headers, "UserRole.Name", "Role Name", "RoleName", "Role");
+  const colCreated = findHeader(headers, "CreatedDate", "Created Date", "Created");
 
   return result.data.map((row, i) => {
     const firstName = (colFirstName ? row[colFirstName] : "") || "";
@@ -114,6 +148,8 @@ export function parseCSV(csvText: string): UserRecord[] {
       isActive: activeVal === "true" || activeVal === "yes" || activeVal === "1",
       lastLoginDate: (colLastLogin ? row[colLastLogin] : "") || null,
       federationId: (colFedId ? row[colFedId] : "") || "",
+      roleName: (colRole ? row[colRole] : "") || "",
+      createdDate: (colCreated ? row[colCreated] : "") || null,
     };
   });
 }
@@ -122,12 +158,12 @@ export function generateSampleCSV(): string {
   const headers = [
     "Id", "First Name", "Last Name", "Name", "Email", "Username",
     "Profile Name", "License Name", "Department", "Is Active",
-    "Last Login Date", "Federation Id",
+    "Last Login Date", "Federation Id", "UserRole.Name", "CreatedDate",
   ];
   const sampleRow = [
     "001ABC", "Jane", "Doe", "Jane Doe", "jane.doe@company.com", "jane.doe@company.com.sfdx",
     "System Administrator", "Salesforce", "Technology", "true",
-    "2025-12-15T10:30:00.000+0000", "jane.doe@company.com",
+    "2025-12-15T10:30:00.000+0000", "jane.doe@company.com", "CEO", "2023-01-15T00:00:00.000+0000",
   ];
   return [headers.join(","), sampleRow.join(",")].join("\n");
 }
