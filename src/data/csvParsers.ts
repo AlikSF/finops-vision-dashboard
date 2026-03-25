@@ -11,8 +11,12 @@ function parseGeneric(csvText: string): Record<string, string>[] {
 }
 
 function findCol(row: Record<string, string>, ...candidates: string[]): string {
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[_\s.]+/g, "");
+  const rowKeys = Object.keys(row);
   for (const c of candidates) {
-    if (row[c] !== undefined) return row[c] || "";
+    const nc = normalize(c);
+    const match = rowKeys.find(k => normalize(k) === nc);
+    if (match !== undefined) return row[match] || "";
   }
   return "";
 }
