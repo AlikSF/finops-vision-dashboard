@@ -1,83 +1,50 @@
 
 
-# Enhanced License Optimization Dashboard — Plan
+# Scaling the Dashboard for 31K Records (All License Types)
 
-## What's Changing
+## Can It Handle It?
 
-You'll add **Role** and **CreatedDate** to your CSV export. The dashboard will use **Profile** as the department/team grouping (since that's how INSEAD organizes Salesforce access), and add new analytical views for Role-based and Profile-based usage insights.
+**Yes — with targeted optimizations.** The CSV parsing (PapaParse) and KPI calculations will work fine with 31K records. However, two bottlenecks need fixing:
 
-## New CSV Columns Needed
+1. **localStorage has a ~5MB limit** — 31K records as JSON will be ~15-20MB and will fail silently
+2. **The table renders ALL rows at once** — 31K DOM rows will freeze the browser
 
-Add these to your Salesforce export:
-- **`UserRole.Name`** — Role in the hierarchy
-- **`CreatedDate`** — When the license was provisioned
+## What Changes
 
-## Data Model Update (`src/data/userData.ts`)
+### 1. Replace localStorage with IndexedDB
+Switch from `localStorage` to **IndexedDB** (via the `idb-keyval` library — tiny, promise-based). IndexedDB can store hundreds of MB with no issues.
 
-Add to `UserRecord`:
-- `roleName: string` — mapped from `UserRole.Name`
-- `createdDate: string | null` — mapped from `CreatedDate`
+**File**: `src/hooks/useUploadedData.ts`
+- Replace `localStorage.getItem/setItem` with `idb-keyval` `get/set/del`
+- Same API surface, just async storage
 
-Update `parseCSV` to map these new headers. Add helpers:
-- `getUniqueRoles(data)` — extract distinct roles
-- `getUniqueProfiles(data)` — extract distinct profiles
-- `getLicenseAge(createdDate)` — days since provisioned
-- Update `computeKPIs` to include `activeUsers` count and `utilizationRate` (active / total as %)
+### 2. Add Table Pagination
+Instead of rendering all 31K rows, paginate the table to show 50 rows per page with Previous/Next controls.
 
-## Sidebar Enhancements (`AppSidebar.tsx`)
+**File**: `src/pages/Index.tsx`
+- Add `currentPage` state
+- Slice `filteredUsers` for display: `filteredUsers.slice(page * 50, (page + 1) * 50)`
+- Add pagination controls below the table using shadcn Pagination component
+- Reset page to 0 when filters change
 
-Add new filter dropdowns:
-- **Profile filter** (replaces current "Department" conceptually — Profile = team at INSEAD)
-- **Role filter** — filter by Salesforce role
+### 3. License Type as a First-Class Dimension
+Community Portal licenses will naturally appear in the existing **License Name** filter and charts. The dashboard already groups by `licenseName` — so Community Portal, Salesforce, Platform, etc. will all show up automatically as distinct categories in:
+- The License Type filter dropdown
+- The Pie Chart (license distribution)
+- KPI calculations
 
-Rename "Department" filter label to "Profile" to match INSEAD's structure.
+No schema changes needed — your CSV already has the `License Name` column mapped.
 
-## Dashboard Enhancements (`Index.tsx`)
-
-### New KPI Tiles (expand from 4 to 6)
-1. Total Licenses (existing)
-2. Active Users — new, shows count of users logged in within 30 days
-3. Ghost Users (existing)
-4. At-Risk Users (existing)
-5. Utilization Rate — new, percentage badge (active/total)
-6. Est. Wasted Spend (existing)
-
-### New Charts (use Tabs to organize)
-
-**Tab 1 — Overview** (current charts):
-- Pie: License Distribution by Profile
-- Bar: Inactive Users by Profile (rename from "Department")
-
-**Tab 2 — Profile Analysis** (new):
-- Horizontal Bar: Users per Profile — shows total, active, ghost stacked
-- Table: Profile summary (profile name, total users, active %, ghost count, estimated waste)
-
-**Tab 3 — Role Analysis** (new):
-- Bar: Users by Role with activity status breakdown
-- Table: Role summary (role name, user count, last login range, utilization %)
-
-**Tab 4 — License Age** (new):
-- Bar: License age distribution (0-30d, 30-90d, 90-180d, 180d-1yr, 1yr+) — helps identify long-held unused licenses
-- Scatter or list: "Oldest ghost licenses" — longest-provisioned users who never/rarely log in
-
-### Table Enhancements
-Add columns:
-- **Role** column
-- **License Age** column (shows "X months" since CreatedDate)
-- Add Role filter to sidebar filters
-
-## Technical Details
-
-- Use shadcn `Tabs` component (already exists) to organize chart sections
-- All new charts use Recharts (already installed)
-- Profile filter added to sidebar alongside existing filters
-- All KPIs and charts remain reactive to all filters
-- `parseCSV` updated to map `UserRole.Name` and `CreatedDate` with flexible header matching
-- Sample CSV template updated to include the new columns
+### 4. Add Record Count Indicator
+Show "Showing X of Y records" above the table so users know the dataset size and filter impact.
 
 ## Files Modified
-1. `src/data/userData.ts` — new fields, helpers, updated parser + template
-2. `src/pages/Index.tsx` — new KPIs, tabbed chart sections, table columns
-3. `src/components/AppSidebar.tsx` — add Profile and Role filter dropdowns
-4. `src/components/DashboardLayout.tsx` — pass new filter props
+1. `src/hooks/useUploadedData.ts` — IndexedDB storage
+2. `src/pages/Index.tsx` — table pagination + record count
+3. `package.json` — add `idb-keyval` dependency
+
+## What Stays the Same
+- All charts, KPIs, and filters work identically — they use `useMemo` over the full dataset
+- CSV parsing handles any license type automatically
+- Profile, Role, and License Age analysis all scale fine (aggregate computations)
 
