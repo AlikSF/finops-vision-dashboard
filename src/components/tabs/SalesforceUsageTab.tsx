@@ -12,6 +12,7 @@ import { ProfileAnalysisTab } from "./ProfileAnalysisTab";
 import { RoleAnalysisTab } from "./RoleAnalysisTab";
 import { ActivityAnalysisTab } from "./ActivityAnalysisTab";
 import { UserDetailTab } from "./UserDetailTab";
+import { SalesforceInsightsTab } from "./SalesforceInsightsTab";
 import type { EnrichedUser, UserLicensePool, LoginRecord, PSLPool } from "@/data/dataModels";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -125,6 +126,7 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="profile">By Profile</TabsTrigger>
           <TabsTrigger value="role">By Role</TabsTrigger>
           <TabsTrigger value="team">By Team/Function</TabsTrigger>
@@ -207,6 +209,9 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
           )}
         </TabsContent>
 
+        <TabsContent value="insights">
+          <SalesforceInsightsTab users={displayUsers} />
+        </TabsContent>
         <TabsContent value="profile">
           <ProfileAnalysisTab users={displayUsers} />
         </TabsContent>
