@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend,
+  CartesianGrid, Tooltip, Legend, LineChart, Line,
 } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProfileAnalysisTab } from "./ProfileAnalysisTab";
@@ -15,6 +15,7 @@ import { RoleAnalysisTab } from "./RoleAnalysisTab";
 import { ActivityAnalysisTab } from "./ActivityAnalysisTab";
 import { UserDetailTab } from "./UserDetailTab";
 import { SalesforceInsightsTab } from "./SalesforceInsightsTab";
+import { format, parseISO, startOfMonth, subMonths, isAfter } from "date-fns";
 import type { EnrichedUser, UserLicensePool, LoginRecord, PSLPool } from "@/data/dataModels";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -59,6 +60,11 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
   const ghost = displayUsers.filter(u => u.usageStatus === "Ghost").length;
   const neverUsed = displayUsers.filter(u => u.usageStatus === "Never Used").length;
 
+  const becomingGhostSoon = displayUsers.filter(u => {
+    if (!u.daysSinceLogin) return false;
+    return u.daysSinceLogin >= 61 && u.daysSinceLogin <= 89;
+  }).length;
+
   const humanUsers = safeAll.filter(
     u => u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical"
   );
@@ -66,16 +72,20 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
     u => u.usageStatus === "Ghost" || u.usageStatus === "Never Used"
   ).length;
 
+  const orgUsageRate = displayUsers.length > 0 ? Math.round((active / displayUsers.length) * 100) : 0;
+
   const kpis = [
-    { label: "Total Users in Scope", value: displayUsers.length },
+    { label: "Users in Scope", value: displayUsers.length },
     { label: "SF License Pool", value: totalPool },
-    { label: "SF Licenses Used", value: usedPool },
-    { label: "SF Licenses Available", value: availablePool },
+    { label: "Licenses Used", value: usedPool },
+    { label: "Licenses Available", value: availablePool },
+    { label: "Org Usage Rate", value: `${orgUsageRate}%`, color: orgUsageRate >= 70 ? "text-green-600" : orgUsageRate >= 50 ? "text-yellow-600" : "text-destructive" },
     { label: "Active (30d)", value: active, color: "text-green-600" },
     { label: "At Risk (31-90d)", value: atRisk, color: "text-yellow-600" },
     { label: "Ghost (>90d)", value: ghost, color: "text-destructive" },
     { label: "Never Used", value: neverUsed, color: "text-muted-foreground" },
-    { label: "Reassignment Candidates", value: reassignCandidates, color: "text-destructive" },
+    { label: "Becoming Ghost", value: becomingGhostSoon, color: "text-orange-500" },
+    { label: "Reassign Candidates", value: reassignCandidates, color: "text-destructive" },
   ];
 
   // Status distribution
@@ -96,13 +106,55 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // Most active users
+  // Last login month trend
+  const loginByMonth = useMemo(() => {
+    const now = new Date();
+    const months: { label: string; start: Date; end: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const s = startOfMonth(subMonths(now, i));
+      const e = i === 0 ? now : startOfMonth(subMonths(now, i - 1));
+      months.push({ label: format(s, "MMM yyyy"), start: s, end: e });
+    }
+    return months.map(m => {
+      const count = displayUsers.filter(u => {
+        if (!u.lastLoginDate) return false;
+        const d = parseISO(u.lastLoginDate);
+        return isAfter(d, m.start) && !isAfter(d, m.end);
+      }).length;
+      return { month: m.label, users: count };
+    });
+  }, [displayUsers]);
+
+  // All users sorted
   const allSorted = useMemo(() => {
     const q = userSearch.toLowerCase();
     return [...displayUsers]
       .filter(u => !q || u.name.toLowerCase().includes(q) || u.profileName?.toLowerCase().includes(q) || u.roleName?.toLowerCase().includes(q))
       .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0));
   }, [displayUsers, userSearch]);
+
+  // Team breakdown table data
+  const teamBreakdown = useMemo(() => {
+    const map = new Map<string, { total: number; active: number; atRisk: number; ghost: number; neverUsed: number }>();
+    displayUsers.forEach(u => {
+      const fn = u.derivedTeamFunction || "Other";
+      const ex = map.get(fn) || { total: 0, active: 0, atRisk: 0, ghost: 0, neverUsed: 0 };
+      ex.total++;
+      if (u.usageStatus === "Active") ex.active++;
+      else if (u.usageStatus === "At Risk") ex.atRisk++;
+      else if (u.usageStatus === "Ghost") ex.ghost++;
+      else ex.neverUsed++;
+      map.set(fn, ex);
+    });
+    return Array.from(map.entries())
+      .map(([name, v]) => ({
+        name, ...v,
+        activeP: v.total > 0 ? Math.round((v.active / v.total) * 100) : 0,
+        ghostP: v.total > 0 ? Math.round((v.ghost / v.total) * 100) : 0,
+        neverP: v.total > 0 ? Math.round((v.neverUsed / v.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [displayUsers]);
 
   return (
     <div className="space-y-4">
@@ -115,13 +167,13 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
       </div>
 
       {/* KPI grid */}
-      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-9 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-11 gap-2">
         {kpis.map(k => (
           <Card key={k.label} className="shadow-sm">
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">{k.label}</p>
-              <p className={`text-xl font-bold ${k.color || "text-foreground"}`}>
-                {k.value.toLocaleString()}
+            <CardContent className="p-2.5 text-center">
+              <p className="text-[10px] text-muted-foreground leading-tight">{k.label}</p>
+              <p className={`text-lg font-bold ${k.color || "text-foreground"}`}>
+                {typeof k.value === "number" ? k.value.toLocaleString() : k.value}
               </p>
             </CardContent>
           </Card>
@@ -181,6 +233,24 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
             </Card>
           </div>
 
+          {/* Last login month trend */}
+          <Card className="shadow-sm mt-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Last Login by Month (Past 6 Months)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={loginByMonth}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="users" fill="hsl(var(--primary))" name="Users" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           {/* Full user list */}
           <Card className="shadow-sm mt-6">
             <CardHeader className="pb-2 flex flex-row items-center justify-between gap-4">
@@ -238,7 +308,7 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
         </TabsContent>
 
         <TabsContent value="insights">
-          <SalesforceInsightsTab users={displayUsers} />
+          <SalesforceInsightsTab users={displayUsers} allHumanUsers={humanUsers} />
         </TabsContent>
         <TabsContent value="profile">
           <ProfileAnalysisTab users={displayUsers} />
@@ -247,46 +317,51 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
           <RoleAnalysisTab users={displayUsers} />
         </TabsContent>
         <TabsContent value="team">
-          {/* Team/function detailed breakdown */}
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Usage by Team / Function</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md overflow-auto max-h-[500px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Team / Function</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Active</TableHead>
-                      <TableHead className="text-right">At Risk</TableHead>
-                      <TableHead className="text-right">Ghost</TableHead>
-                      <TableHead className="text-right">Never Used</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {teamData.map(t => {
-                      const teamUsers = displayUsers.filter(u => (u.derivedTeamFunction || "Other") === t.name);
-                      return (
-                        <TableRow key={t.name}>
+          {/* Team/function detailed breakdown with percentages */}
+          <div className="space-y-6">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Usage by Team / Function</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-md overflow-auto max-h-[600px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Team / Function</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Active</TableHead>
+                        <TableHead className="text-right">Active %</TableHead>
+                        <TableHead className="text-right">At Risk</TableHead>
+                        <TableHead className="text-right">Ghost</TableHead>
+                        <TableHead className="text-right">Ghost %</TableHead>
+                        <TableHead className="text-right">Never Used</TableHead>
+                        <TableHead className="text-right">Never Used %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teamBreakdown.map((t, i) => (
+                        <TableRow key={t.name} className={i % 2 === 1 ? "bg-muted/30" : ""}>
                           <TableCell className="text-xs font-medium">{t.name}</TableCell>
-                          <TableCell className="text-xs text-right">{teamUsers.length}</TableCell>
-                          <TableCell className="text-xs text-right">{teamUsers.filter(u => u.usageStatus === "Active").length}</TableCell>
-                          <TableCell className="text-xs text-right">{teamUsers.filter(u => u.usageStatus === "At Risk").length}</TableCell>
-                          <TableCell className="text-xs text-right">{teamUsers.filter(u => u.usageStatus === "Ghost").length}</TableCell>
-                          <TableCell className="text-xs text-right">{teamUsers.filter(u => u.usageStatus === "Never Used").length}</TableCell>
+                          <TableCell className="text-xs text-right font-semibold">{t.total}</TableCell>
+                          <TableCell className="text-xs text-right">{t.active}</TableCell>
+                          <TableCell className="text-xs text-right text-green-600">{t.activeP}%</TableCell>
+                          <TableCell className="text-xs text-right">{t.atRisk}</TableCell>
+                          <TableCell className="text-xs text-right">{t.ghost}</TableCell>
+                          <TableCell className="text-xs text-right text-destructive">{t.ghostP}%</TableCell>
+                          <TableCell className="text-xs text-right">{t.neverUsed}</TableCell>
+                          <TableCell className="text-xs text-right text-muted-foreground">{t.neverP}%</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
         <TabsContent value="activity">
-          <ActivityAnalysisTab users={displayUsers} loginHistory={loginHistory} hasLoginHistory={hasLoginHistory} />
+          <ActivityAnalysisTab users={displayUsers} loginHistory={loginHistory} hasLoginHistory={hasLoginHistory} includeSystem={includeSystem} />
         </TabsContent>
         <TabsContent value="detail">
           <UserDetailTab users={displayUsers} hasLoginHistory={hasLoginHistory} />

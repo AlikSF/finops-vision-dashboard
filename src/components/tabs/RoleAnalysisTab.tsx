@@ -20,7 +20,12 @@ export function RoleAnalysisTab({ users }: RoleAnalysisTabProps) {
   });
 
   const roleData = Array.from(roleMap.entries())
-    .map(([name, v]) => ({ name, ...v }))
+    .map(([name, v]) => ({
+      name, ...v,
+      activeP: v.total > 0 ? Math.round((v.active / v.total) * 100) : 0,
+      ghostP: v.total > 0 ? Math.round((v.ghost / v.total) * 100) : 0,
+      neverP: v.total > 0 ? Math.round((v.neverUsed / v.total) * 100) : 0,
+    }))
     .sort((a, b) => b.total - a.total);
 
   const top10 = roleData.slice(0, 10);
@@ -61,9 +66,12 @@ export function RoleAnalysisTab({ users }: RoleAnalysisTabProps) {
                   <TableHead>Role</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Active</TableHead>
+                  <TableHead className="text-right">Active %</TableHead>
                   <TableHead className="text-right">At Risk</TableHead>
                   <TableHead className="text-right">Ghost</TableHead>
+                  <TableHead className="text-right">Ghost %</TableHead>
                   <TableHead className="text-right">Never Used</TableHead>
+                  <TableHead className="text-right">Never Used %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -72,9 +80,12 @@ export function RoleAnalysisTab({ users }: RoleAnalysisTabProps) {
                     <TableCell className="font-medium text-xs max-w-[250px] truncate">{r.name}</TableCell>
                     <TableCell className="text-right text-xs font-semibold">{r.total}</TableCell>
                     <TableCell className="text-right text-xs">{r.active}</TableCell>
+                    <TableCell className="text-right text-xs text-green-600">{r.activeP}%</TableCell>
                     <TableCell className="text-right text-xs">{r.atRisk}</TableCell>
                     <TableCell className="text-right text-xs">{r.ghost}</TableCell>
+                    <TableCell className="text-right text-xs text-destructive">{r.ghostP}%</TableCell>
                     <TableCell className="text-right text-xs">{r.neverUsed}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">{r.neverP}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -29,6 +29,17 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_OPTIONS = ["All", "Active", "At Risk", "Ghost", "Never Used"];
 
+// Large entitlement/capacity PSLs that shouldn't be treated as user-based adoption
+const ENTITLEMENT_PSLS = [
+  "data cloud", "einstein", "tableau", "mulesoft", "api", "sandbox",
+  "platform cache", "b2b commerce", "commerce cloud",
+];
+
+function isEntitlementPSL(name: string): boolean {
+  const lower = name.toLowerCase();
+  return ENTITLEMENT_PSLS.some(e => lower.includes(e)) && !lower.includes("user") && !lower.includes("login");
+}
+
 function UserDrillTable({ users, label }: { users: EnrichedUser[]; label: string }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -48,21 +59,12 @@ function UserDrillTable({ users, label }: { users: EnrichedUser[]; label: string
 
   return (
     <div className="space-y-3 mt-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <p className="text-xs font-semibold text-muted-foreground">{label} ({filtered.length})</p>
-        <Input
-          placeholder="Search name, profile, role…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="max-w-xs h-7 text-xs"
-        />
+        <Input placeholder="Search name, profile, role…" value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs h-7 text-xs" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] h-7 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
+          <SelectTrigger className="w-[140px] h-7 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>{STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="border rounded-md overflow-auto max-h-[400px]">
@@ -91,9 +93,7 @@ function UserDrillTable({ users, label }: { users: EnrichedUser[]; label: string
                     {u.usageStatus}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-xs">
-                  {u.lastLoginDate ? format(parseISO(u.lastLoginDate), "MMM d, yyyy") : "Never"}
-                </TableCell>
+                <TableCell className="text-xs">{u.lastLoginDate ? format(parseISO(u.lastLoginDate), "MMM d, yyyy") : "Never"}</TableCell>
                 <TableCell className="text-xs text-right">{u.logins30d ?? 0}</TableCell>
                 <TableCell className="text-xs text-right">{u.daysSince ?? "—"}</TableCell>
               </TableRow>
@@ -138,7 +138,7 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
     return map;
   }, [safeUsers]);
 
-  // PSL table
+  // PSL table — split user-based vs entitlement
   const pslData = safePsl
     .filter(p => p.totalLicenses > 0 || p.usedLicenses > 0)
     .map(p => ({
@@ -148,8 +148,12 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
       used: p.usedLicenses,
       available: Math.max(0, p.totalLicenses - p.usedLicenses),
       utilization: p.totalLicenses > 0 ? Math.round((p.usedLicenses / p.totalLicenses) * 100) : 0,
+      isEntitlement: isEntitlementPSL(p.masterLabel),
     }))
     .sort((a, b) => b.used - a.used);
+
+  const userBasedPSLs = pslData.filter(p => !p.isEntitlement);
+  const entitlementPSLs = pslData.filter(p => p.isEntitlement);
 
   // Add-on adoption detail
   const allAddOns = useMemo(() => {
@@ -157,7 +161,13 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
     return Array.from(set).sort();
   }, [safeUsers]);
 
-  const defaultAddOn = allAddOns.find(a => a.toLowerCase().includes("crm analytics")) || allAddOns[0] || "";
+  // Focus add-ons for detailed analysis
+  const focusAddOns = useMemo(() => {
+    const focus = ["CRM Analytics Plus", "CRM Analytics For Community Logins", "Sales User"];
+    return allAddOns.filter(a => focus.some(f => a.toLowerCase().includes(f.toLowerCase())) || !isEntitlementPSL(a));
+  }, [allAddOns]);
+
+  const defaultAddOn = focusAddOns.find(a => a.toLowerCase().includes("crm analytics plus")) || focusAddOns[0] || allAddOns[0] || "";
   const [selectedAddOn, setSelectedAddOn] = useState(defaultAddOn);
 
   const addOnUsers = useMemo(() => {
@@ -165,15 +175,16 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
     return safeUsers.filter(u => (u.addOnLicenses || []).includes(selectedAddOn));
   }, [safeUsers, selectedAddOn]);
 
-  const addOnPool = safePsl.find(
-    p => p.masterLabel === selectedAddOn || p.developerName === selectedAddOn
-  );
+  const addOnPool = safePsl.find(p => p.masterLabel === selectedAddOn || p.developerName === selectedAddOn);
 
   const addOnActive = addOnUsers.filter(u => u.usageStatus === "Active").length;
   const addOnAtRisk = addOnUsers.filter(u => u.usageStatus === "At Risk").length;
   const addOnGhost = addOnUsers.filter(u => u.usageStatus === "Ghost").length;
   const addOnNever = addOnUsers.filter(u => u.usageStatus === "Never Used").length;
-  const addOnReassign = addOnGhost + addOnNever;
+  const addOnReassign = addOnUsers.filter(
+    u => (u.usageStatus === "Ghost" || u.usageStatus === "Never Used") &&
+      u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical"
+  ).length;
 
   // Breakdowns
   const breakdown = (key: "profileName" | "roleName" | "derivedTeamFunction") => {
@@ -195,6 +206,8 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
   const byRole = useMemo(() => breakdown("roleName"), [addOnUsers]);
   const byTeam = useMemo(() => breakdown("derivedTeamFunction"), [addOnUsers]);
 
+  const addOnAvailable = addOnPool ? Math.max(0, addOnPool.totalLicenses - addOnPool.usedLicenses) : null;
+
   return (
     <div className="space-y-6">
       {/* Section A: Primary License Pool */}
@@ -207,69 +220,68 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
           {primaryData.length === 0 ? (
             <p className="text-sm text-muted-foreground">Upload User License Pool CSV to see data.</p>
           ) : (
-            <div className="space-y-0">
-              <div className="border rounded-md overflow-auto max-h-[400px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>License Type</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Used</TableHead>
-                      <TableHead className="text-right">Available</TableHead>
-                      <TableHead className="text-right w-[120px]">Utilization</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {primaryData.map((l, i) => {
-                      const isExpanded = expandedLicense === l.name;
-                      const licenseUsers = usersByLicense.get(l.name) || [];
-                      return (
-                        <>
-                          <TableRow
-                            key={l.name}
-                            className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/30" : ""}`}
-                            onClick={() => setExpandedLicense(isExpanded ? null : l.name)}
-                          >
-                            <TableCell className="text-xs px-2">
-                              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                            </TableCell>
-                            <TableCell className="font-medium text-xs">{l.name}</TableCell>
-                            <TableCell className="text-right text-xs">{l.total.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-xs">{l.used.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-xs">{l.available.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-xs">
-                              <div className="flex items-center gap-2 justify-end">
-                                <Progress value={l.utilization} className="w-16 h-2" />
-                                <span className={l.utilization > 80 ? "text-destructive font-semibold" : ""}>{l.utilization}%</span>
-                              </div>
+            <div className="border rounded-md overflow-auto max-h-[400px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>License Type</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Used</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
+                    <TableHead className="text-right w-[120px]">Utilization</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {primaryData.map((l, i) => {
+                    const isExpanded = expandedLicense === l.name;
+                    const licenseUsers = usersByLicense.get(l.name) || [];
+                    return (
+                      <>{/* Fragment for expandable row */}
+                        <TableRow
+                          key={l.name}
+                          className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/30" : ""}`}
+                          onClick={() => setExpandedLicense(isExpanded ? null : l.name)}
+                        >
+                          <TableCell className="text-xs px-2">
+                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          </TableCell>
+                          <TableCell className="font-medium text-xs">{l.name}</TableCell>
+                          <TableCell className="text-right text-xs">{l.total.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs">{l.used.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs">{l.available.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Progress value={l.utilization} className="w-16 h-2" />
+                              <span className={l.utilization > 80 ? "text-destructive font-semibold" : ""}>{l.utilization}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && licenseUsers.length > 0 && (
+                          <TableRow key={`${l.name}-detail`}>
+                            <TableCell colSpan={6} className="p-3 bg-muted/20">
+                              <UserDrillTable users={licenseUsers} label={`Users with "${l.name}" license`} />
                             </TableCell>
                           </TableRow>
-                          {isExpanded && licenseUsers.length > 0 && (
-                            <TableRow key={`${l.name}-detail`}>
-                              <TableCell colSpan={6} className="p-3 bg-muted/20">
-                                <UserDrillTable users={licenseUsers} label={`Users with "${l.name}" license`} />
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                        )}
+                      </>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Section B: PSL Pool */}
+      {/* Section B: User-based PSL Pool */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Add-on / Permission Set License Pool</CardTitle>
+          <CardTitle className="text-sm font-semibold">User-Based Add-on Licenses</CardTitle>
+          <p className="text-xs text-muted-foreground">Permission Set Licenses assigned to individual users</p>
         </CardHeader>
         <CardContent>
-          {pslData.length === 0 ? (
+          {userBasedPSLs.length === 0 ? (
             <p className="text-sm text-muted-foreground">Upload PSL Pool CSV to see data.</p>
           ) : (
             <div className="border rounded-md overflow-auto max-h-[400px]">
@@ -284,7 +296,7 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pslData.map((p, i) => (
+                  {userBasedPSLs.map((p, i) => (
                     <TableRow key={p.name + i} className={i % 2 === 1 ? "bg-muted/30" : ""}>
                       <TableCell className="font-medium text-xs">{p.name}</TableCell>
                       <TableCell className="text-right text-xs">{p.total.toLocaleString()}</TableCell>
@@ -305,6 +317,47 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
         </CardContent>
       </Card>
 
+      {/* Entitlement / Capacity PSLs */}
+      {entitlementPSLs.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Entitlement / Capacity Licenses</CardTitle>
+            <p className="text-xs text-muted-foreground">Platform entitlements not assigned per-user</p>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-md overflow-auto max-h-[300px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>License</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Used</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
+                    <TableHead className="text-right w-[120px]">Utilization</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entitlementPSLs.map((p, i) => (
+                    <TableRow key={p.name + i} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                      <TableCell className="font-medium text-xs">{p.name}</TableCell>
+                      <TableCell className="text-right text-xs">{p.total.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-xs">{p.used.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-xs">{p.available.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-xs">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Progress value={p.utilization} className="w-16 h-2" />
+                          <span>{p.utilization}%</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Section C: Add-on Adoption Detail */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
@@ -312,7 +365,7 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
             <CardTitle className="text-sm font-semibold">Add-on Adoption Detail</CardTitle>
             {allAddOns.length > 0 && (
               <Select value={selectedAddOn} onValueChange={setSelectedAddOn}>
-                <SelectTrigger className="w-[280px] text-xs h-8">
+                <SelectTrigger className="w-[300px] text-xs h-8">
                   <SelectValue placeholder="Select add-on license" />
                 </SelectTrigger>
                 <SelectContent>
@@ -328,19 +381,20 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
           ) : (
             <div className="space-y-4">
               {/* Add-on KPIs */}
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
                 {[
                   { label: "Total Licenses", value: addOnPool?.totalLicenses ?? "–" },
                   { label: "Assigned", value: addOnUsers.length },
-                  { label: "Active Assigned", value: addOnActive, color: "text-green-600" },
-                  { label: "At Risk Assigned", value: addOnAtRisk, color: "text-yellow-600" },
-                  { label: "Ghost Assigned", value: addOnGhost, color: "text-destructive" },
+                  { label: "Available", value: addOnAvailable ?? "–" },
+                  { label: "Active (30d)", value: addOnActive, color: "text-green-600" },
+                  { label: "At Risk", value: addOnAtRisk, color: "text-yellow-600" },
+                  { label: "Ghost", value: addOnGhost, color: "text-destructive" },
                   { label: "Never Used", value: addOnNever, color: "text-muted-foreground" },
-                  { label: "Reassignment Candidates", value: addOnReassign, color: "text-destructive" },
+                  { label: "Reassign Candidates", value: addOnReassign, color: "text-destructive" },
                 ].map(k => (
                   <Card key={k.label} className="shadow-sm">
-                    <CardContent className="p-3 text-center">
-                      <p className="text-xs text-muted-foreground">{k.label}</p>
+                    <CardContent className="p-2.5 text-center">
+                      <p className="text-[10px] text-muted-foreground leading-tight">{k.label}</p>
                       <p className={`text-lg font-bold ${k.color || "text-foreground"}`}>
                         {typeof k.value === "number" ? k.value.toLocaleString() : k.value}
                       </p>
@@ -352,9 +406,9 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
               {/* Breakdown tables */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {([
-                  { title: "By Profile", data: byProfile },
-                  { title: "By Role", data: byRole },
-                  { title: "By Team/Function", data: byTeam },
+                  { title: "Assigned by Profile", data: byProfile },
+                  { title: "Assigned by Role", data: byRole },
+                  { title: "Assigned by Team/Function", data: byTeam },
                 ] as const).map(section => (
                   <Card key={section.title} className="shadow-sm">
                     <CardHeader className="pb-2">
@@ -389,7 +443,7 @@ export function LicenseUsageTab({ users, licensePool, pslPool }: Props) {
               </div>
 
               {/* Full user list for selected add-on */}
-              <UserDrillTable users={addOnUsers} label={`Users with "${selectedAddOn}"`} />
+              <UserDrillTable users={addOnUsers} label={`Assigned User Detail — "${selectedAddOn}"`} />
             </div>
           )}
         </CardContent>
