@@ -66,6 +66,12 @@ export function SalesforceInsightsTab({ users }: Props) {
     [users],
   );
 
+  // Never Used users
+  const neverUsedUsers = useMemo(
+    () => users.filter(u => u.usageStatus === "Never Used"),
+    [users],
+  );
+
   // Admin users
   const adminUsers = useMemo(
     () => users.filter(u => u.derivedCategory === "Internal Admin"),
