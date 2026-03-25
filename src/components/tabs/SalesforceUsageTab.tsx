@@ -181,38 +181,56 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
             </Card>
           </div>
 
-          {/* Most active */}
-          {topUsers.length > 0 && (
-            <Card className="shadow-sm mt-6">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Most Active Salesforce Users (30d)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-md overflow-auto max-h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Profile</TableHead>
-                        <TableHead>Team/Function</TableHead>
-                        <TableHead className="text-right">Logins (30d)</TableHead>
+          {/* Full user list */}
+          <Card className="shadow-sm mt-6">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-4">
+              <CardTitle className="text-sm font-semibold">All Salesforce Users ({allSorted.length})</CardTitle>
+              <Input
+                placeholder="Search by name, profile or role…"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="max-w-xs h-8 text-xs"
+              />
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-md overflow-auto max-h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Profile</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Team/Function</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead className="text-right">Logins (30d)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allSorted.map(u => (
+                      <TableRow key={u.id}>
+                        <TableCell className="text-xs font-medium">{u.name}</TableCell>
+                        <TableCell className="text-xs">{u.profileName}</TableCell>
+                        <TableCell className="text-xs">{u.roleName || "—"}</TableCell>
+                        <TableCell className="text-xs">{u.derivedTeamFunction}</TableCell>
+                        <TableCell className="text-xs">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0"
+                            style={{ borderColor: STATUS_COLORS[u.usageStatus], color: STATUS_COLORS[u.usageStatus] }}
+                          >
+                            {u.usageStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">{u.lastLoginDate ? new Date(u.lastLoginDate).toLocaleDateString() : "Never"}</TableCell>
+                        <TableCell className="text-xs text-right">{u.logins30d}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {topUsers.map(u => (
-                        <TableRow key={u.id}>
-                          <TableCell className="text-xs font-medium">{u.name}</TableCell>
-                          <TableCell className="text-xs">{u.profileName}</TableCell>
-                          <TableCell className="text-xs">{u.derivedTeamFunction}</TableCell>
-                          <TableCell className="text-xs text-right">{u.logins30d}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="insights">
