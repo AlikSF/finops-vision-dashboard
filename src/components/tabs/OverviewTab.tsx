@@ -37,7 +37,7 @@ export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) 
   const usedPrimaryLicenses = safeLicensePool.reduce((s, l) => s + l.usedLicenses, 0);
 
   // Waste (exclude Automated/System, Integration/Technical, and external categories)
-  const wasteUsers = allUsers.filter(u =>
+  const wasteUsers = safeAllUsers.filter(u =>
     u.derivedCategory !== "Automated/System" &&
     u.derivedCategory !== "Integration/Technical" &&
     u.derivedCategory !== "ePortal B2C" &&
