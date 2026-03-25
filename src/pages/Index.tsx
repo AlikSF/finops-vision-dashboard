@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -19,12 +20,15 @@ import {
 import { useUploadedData } from "@/hooks/useUploadedData";
 
 const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--destructive))",
-  "hsl(153, 60%, 40%)",
+  "hsl(153, 60%, 35%)",
   "hsl(200, 70%, 50%)",
+  "hsl(35, 92%, 50%)",
+  "hsl(280, 60%, 55%)",
+  "hsl(340, 70%, 55%)",
+  "hsl(170, 55%, 45%)",
+  "hsl(45, 85%, 55%)",
+  "hsl(220, 65%, 55%)",
+  "hsl(0, 0%, 60%)",
 ];
 
 function StatusBadge({ status }: { status: "ghost" | "at-risk" | "active" }) {
@@ -61,7 +65,7 @@ function EmptyState() {
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="max-w-md w-full text-center">
+      <Card className="max-w-md w-full text-center shadow-lg">
         <CardContent className="pt-8 pb-8 space-y-4">
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <Upload className="h-8 w-8 text-primary" />
@@ -78,6 +82,20 @@ function EmptyState() {
       </Card>
     </div>
   );
+}
+
+/** Group small slices into "Other" — keep top N */
+function groupSmallSlices(data: { name: string; value: number }[], topN: number) {
+  const sorted = [...data].sort((a, b) => b.value - a.value);
+  if (sorted.length <= topN) return sorted;
+  const top = sorted.slice(0, topN);
+  const otherValue = sorted.slice(topN).reduce((sum, d) => sum + d.value, 0);
+  return [...top, { name: `Other (${sorted.length - topN})`, value: otherValue }];
+}
+
+/** Truncate long text */
+function truncate(text: string, maxLen: number) {
+  return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
 }
 
 const ROWS_PER_PAGE = 50;
@@ -123,6 +141,8 @@ const Index = () => {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [filteredUsers]);
 
+  const pieData = useMemo(() => groupSmallSlices(licenseDistribution, 8), [licenseDistribution]);
+
   const inactiveByProfile = useMemo(() => {
     const map: Record<string, { ghost: number; atRisk: number; active: number }> = {};
     filteredUsers.forEach((u) => {
@@ -131,7 +151,10 @@ const Index = () => {
       const status = getLoginStatus(getDaysSinceLogin(u.lastLoginDate));
       map[profile][status === "at-risk" ? "atRisk" : status]++;
     });
-    return Object.entries(map).map(([profile, counts]) => ({ profile, ...counts }));
+    return Object.entries(map)
+      .map(([profile, counts]) => ({ profile, total: counts.active + counts.atRisk + counts.ghost, ...counts }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 12);
   }, [filteredUsers]);
 
   // Role analysis
@@ -146,7 +169,10 @@ const Index = () => {
       else if (status === "ghost") map[role].ghost++;
       else map[role].atRisk++;
     });
-    return Object.entries(map).map(([role, counts]) => ({ role, ...counts }));
+    return Object.entries(map)
+      .map(([role, counts]) => ({ role, ...counts }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 12);
   }, [filteredUsers]);
 
   // Profile summary table
@@ -160,13 +186,15 @@ const Index = () => {
       if (status === "active") map[p].active++;
       else if (status === "ghost") map[p].ghost++;
     });
-    return Object.entries(map).map(([profile, c]) => ({
-      profile,
-      total: c.total,
-      activePercent: c.total > 0 ? Math.round((c.active / c.total) * 100) : 0,
-      ghostCount: c.ghost,
-      estimatedWaste: c.ghost * 150,
-    }));
+    return Object.entries(map)
+      .map(([profile, c]) => ({
+        profile,
+        total: c.total,
+        activePercent: c.total > 0 ? Math.round((c.active / c.total) * 100) : 0,
+        ghostCount: c.ghost,
+        estimatedWaste: c.ghost * 150,
+      }))
+      .sort((a, b) => b.total - a.total);
   }, [filteredUsers]);
 
   // License age distribution
@@ -193,10 +221,10 @@ const Index = () => {
   }, [filteredUsers]);
 
   const kpiCards = [
-    { title: "Total Licenses", value: kpis.totalLicenses, icon: Users, color: "text-primary" },
-    { title: "Active Users", value: kpis.activeUsers, subtitle: "Logged in <30 days", icon: Activity, color: "text-emerald-600 dark:text-emerald-400" },
-    { title: "Ghost Users", value: kpis.ghostUsers, subtitle: ">90 days inactive", icon: Ghost, color: "text-destructive" },
-    { title: "At-Risk Users", value: kpis.atRiskUsers, subtitle: ">30 days inactive", icon: AlertTriangle, color: "text-orange-600 dark:text-orange-400" },
+    { title: "Total Licenses", value: kpis.totalLicenses.toLocaleString(), icon: Users, color: "text-primary" },
+    { title: "Active Users", value: kpis.activeUsers.toLocaleString(), subtitle: "Logged in <30 days", icon: Activity, color: "text-emerald-600 dark:text-emerald-400" },
+    { title: "Ghost Users", value: kpis.ghostUsers.toLocaleString(), subtitle: ">90 days inactive", icon: Ghost, color: "text-destructive" },
+    { title: "At-Risk Users", value: kpis.atRiskUsers.toLocaleString(), subtitle: ">30 days inactive", icon: AlertTriangle, color: "text-orange-600 dark:text-orange-400" },
     { title: "Utilization Rate", value: `${kpis.utilizationRate}%`, icon: TrendingUp, color: kpis.utilizationRate >= 70 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive" },
     { title: "Est. Wasted Spend", value: `$${kpis.wastedSpend.toLocaleString()}`, subtitle: "/month", icon: DollarSign, color: "text-destructive" },
   ];
@@ -220,17 +248,17 @@ const Index = () => {
       {users.length === 0 ? (
         <EmptyState />
       ) : (
-        <>
-          {/* KPI Tiles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+        <div className="space-y-8">
+          {/* KPI Tiles — 3 per row for readability */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {kpiCards.map((kpi) => (
-              <Card key={kpi.title} className="border-l-4 border-l-primary">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">{kpi.title}</CardTitle>
-                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+              <Card key={kpi.title} className="border-l-4 border-l-primary shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-5">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.title}</CardTitle>
+                  <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
                 </CardHeader>
-                <CardContent>
-                  <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
+                <CardContent className="px-5 pb-5">
+                  <div className={`text-3xl font-bold tracking-tight ${kpi.color}`}>{kpi.value}</div>
                   {kpi.subtitle && <p className="text-xs text-muted-foreground mt-1">{kpi.subtitle}</p>}
                 </CardContent>
               </Card>
@@ -238,7 +266,7 @@ const Index = () => {
           </div>
 
           {/* Tabbed Charts */}
-          <Tabs defaultValue="overview" className="mb-6">
+          <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="profiles">Profile Analysis</TabsTrigger>
@@ -246,191 +274,217 @@ const Index = () => {
               <TabsTrigger value="age">License Age</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview">
+            <TabsContent value="overview" className="mt-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+                {/* Pie Chart with side legend */}
+                <Card className="shadow-sm">
                   <CardHeader><CardTitle className="text-base">License Distribution by Profile</CardTitle></CardHeader>
-                  <CardContent className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={licenseDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, value }) => `${name} (${value})`}>
-                          {licenseDistribution.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  <CardContent>
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                      <div className="w-full md:w-1/2 h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={110} paddingAngle={2} dataKey="value">
+                              {pieData.map((_, i) => (
+                                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => value.toLocaleString()} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <ScrollArea className="w-full md:w-1/2 h-[280px]">
+                        <div className="space-y-2 pr-3">
+                          {pieData.map((entry, i) => (
+                            <div key={entry.name} className="flex items-center justify-between text-sm gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                <span className="truncate text-foreground">{entry.name}</span>
+                              </div>
+                              <span className="font-medium text-muted-foreground tabular-nums shrink-0">{entry.value.toLocaleString()}</span>
+                            </div>
                           ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Activity by Profile</CardTitle></CardHeader>
-                  <CardContent className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={inactiveByProfile}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="profile" className="text-xs" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="active" name="Active" fill="hsl(153, 60%, 40%)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="atRisk" name="At Risk (>30d)" fill="hsl(35, 92%, 50%)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="ghost" name="Ghost (>90d)" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
 
-            <TabsContent value="profiles">
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Users per Profile</CardTitle></CardHeader>
-                  <CardContent className="h-[300px]">
+                {/* Bar chart — horizontal for long profile names */}
+                <Card className="shadow-sm">
+                  <CardHeader><CardTitle className="text-base">Activity by Profile (Top 12)</CardTitle></CardHeader>
+                  <CardContent className="h-[380px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={inactiveByProfile} layout="vertical">
+                      <BarChart data={inactiveByProfile} layout="vertical" margin={{ left: 10, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis type="number" allowDecimals={false} />
-                        <YAxis type="category" dataKey="profile" width={150} className="text-xs" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="profile" width={140} tick={{ fontSize: 11 }} tickFormatter={(v) => truncate(v, 20)} />
                         <Tooltip />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="active" name="Active" stackId="a" fill="hsl(153, 60%, 40%)" />
                         <Bar dataKey="atRisk" name="At Risk" stackId="a" fill="hsl(35, 92%, 50%)" />
-                        <Bar dataKey="ghost" name="Ghost" stackId="a" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="ghost" name="Ghost" stackId="a" fill="hsl(0, 70%, 55%)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-                <Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="profiles" className="mt-4">
+              <div className="space-y-6">
+                <Card className="shadow-sm">
+                  <CardHeader><CardTitle className="text-base">Users per Profile (Top 12)</CardTitle></CardHeader>
+                  <CardContent className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={inactiveByProfile} layout="vertical" margin={{ left: 10, right: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="profile" width={150} tick={{ fontSize: 11 }} tickFormatter={(v) => truncate(v, 22)} />
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="active" name="Active" stackId="a" fill="hsl(153, 60%, 40%)" />
+                        <Bar dataKey="atRisk" name="At Risk" stackId="a" fill="hsl(35, 92%, 50%)" />
+                        <Bar dataKey="ghost" name="Ghost" stackId="a" fill="hsl(0, 70%, 55%)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
                   <CardHeader><CardTitle className="text-base">Profile Summary</CardTitle></CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Profile</TableHead>
-                          <TableHead>Total Users</TableHead>
-                          <TableHead>Active %</TableHead>
-                          <TableHead>Ghost Users</TableHead>
-                          <TableHead>Est. Waste/mo</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {profileSummary.map((p) => (
-                          <TableRow key={p.profile}>
-                            <TableCell className="font-medium">{p.profile}</TableCell>
-                            <TableCell>{p.total}</TableCell>
-                            <TableCell>
-                              <Badge variant={p.activePercent >= 70 ? "default" : "destructive"} className="text-xs">
-                                {p.activePercent}%
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{p.ghostCount}</TableCell>
-                            <TableCell className="text-destructive font-medium">${p.estimatedWaste.toLocaleString()}</TableCell>
+                    <ScrollArea className="max-h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Profile</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="text-right">Active %</TableHead>
+                            <TableHead className="text-right">Ghost</TableHead>
+                            <TableHead className="text-right">Est. Waste/mo</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {profileSummary.map((p, i) => (
+                            <TableRow key={p.profile} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+                              <TableCell className="font-medium max-w-[200px] truncate">{p.profile}</TableCell>
+                              <TableCell className="text-right tabular-nums">{p.total.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant={p.activePercent >= 70 ? "default" : "destructive"} className="text-xs">
+                                  {p.activePercent}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">{p.ghostCount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-destructive font-medium tabular-nums">${p.estimatedWaste.toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
-            <TabsContent value="roles">
+            <TabsContent value="roles" className="mt-4">
               <div className="space-y-6">
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Users by Role</CardTitle></CardHeader>
-                  <CardContent className="h-[300px]">
+                <Card className="shadow-sm">
+                  <CardHeader><CardTitle className="text-base">Users by Role (Top 12)</CardTitle></CardHeader>
+                  <CardContent className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={roleAnalysis}>
+                      <BarChart data={roleAnalysis} layout="vertical" margin={{ left: 10, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="role" className="text-xs" />
-                        <YAxis allowDecimals={false} />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="role" width={150} tick={{ fontSize: 11 }} tickFormatter={(v) => truncate(v, 22)} />
                         <Tooltip />
-                        <Legend />
-                        <Bar dataKey="active" name="Active" stackId="a" fill="hsl(153, 60%, 40%)" radius={[4, 4, 0, 0]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="active" name="Active" stackId="a" fill="hsl(153, 60%, 40%)" />
                         <Bar dataKey="atRisk" name="At Risk" stackId="a" fill="hsl(35, 92%, 50%)" />
-                        <Bar dataKey="ghost" name="Ghost" stackId="a" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="ghost" name="Ghost" stackId="a" fill="hsl(0, 70%, 55%)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="shadow-sm">
                   <CardHeader><CardTitle className="text-base">Role Summary</CardTitle></CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Active</TableHead>
-                          <TableHead>Ghost</TableHead>
-                          <TableHead>Utilization</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {roleAnalysis.map((r) => (
-                          <TableRow key={r.role}>
-                            <TableCell className="font-medium">{r.role}</TableCell>
-                            <TableCell>{r.total}</TableCell>
-                            <TableCell className="text-emerald-600 dark:text-emerald-400">{r.active}</TableCell>
-                            <TableCell className="text-destructive">{r.ghost}</TableCell>
-                            <TableCell>
-                              <Badge variant={r.total > 0 && (r.active / r.total) >= 0.7 ? "default" : "destructive"} className="text-xs">
-                                {r.total > 0 ? Math.round((r.active / r.total) * 100) : 0}%
-                              </Badge>
-                            </TableCell>
+                    <ScrollArea className="max-h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Role</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="text-right">Active</TableHead>
+                            <TableHead className="text-right">Ghost</TableHead>
+                            <TableHead className="text-right">Utilization</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {roleAnalysis.map((r, i) => (
+                            <TableRow key={r.role} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+                              <TableCell className="font-medium max-w-[200px] truncate">{r.role}</TableCell>
+                              <TableCell className="text-right tabular-nums">{r.total.toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">{r.active.toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums text-destructive">{r.ghost.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant={r.total > 0 && (r.active / r.total) >= 0.7 ? "default" : "destructive"} className="text-xs">
+                                  {r.total > 0 ? Math.round((r.active / r.total) * 100) : 0}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
-            <TabsContent value="age">
+            <TabsContent value="age" className="mt-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
+                <Card className="shadow-sm">
                   <CardHeader><CardTitle className="text-base">License Age Distribution</CardTitle></CardHeader>
-                  <CardContent className="h-[280px]">
+                  <CardContent className="h-[380px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={licenseAgeDistribution}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="range" className="text-xs" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Bar dataKey="count" name="Licenses" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <XAxis dataKey="range" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value: number) => value.toLocaleString()} />
+                        <Bar dataKey="count" name="Licenses" fill="hsl(153, 60%, 35%)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="shadow-sm">
                   <CardHeader><CardTitle className="text-base">Oldest Ghost Licenses</CardTitle></CardHeader>
                   <CardContent>
                     {oldestGhosts.length === 0 ? (
                       <p className="text-muted-foreground text-sm text-center py-8">No ghost users with creation dates found.</p>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Profile</TableHead>
-                            <TableHead>License Age</TableHead>
-                            <TableHead>Last Login</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {oldestGhosts.map((u) => (
-                            <TableRow key={u.id}>
-                              <TableCell className="font-medium">{u.name}</TableCell>
-                              <TableCell>{u.profileName}</TableCell>
-                              <TableCell className="text-destructive font-medium">{formatLicenseAge(u.createdDate)}</TableCell>
-                              <TableCell><LoginDateCell date={u.lastLoginDate} /></TableCell>
+                      <ScrollArea className="max-h-[340px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Profile</TableHead>
+                              <TableHead>License Age</TableHead>
+                              <TableHead>Last Login</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {oldestGhosts.map((u, i) => (
+                              <TableRow key={u.id} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+                                <TableCell className="font-medium">{u.name}</TableCell>
+                                <TableCell className="max-w-[120px] truncate">{u.profileName}</TableCell>
+                                <TableCell className="text-destructive font-medium tabular-nums">{formatLicenseAge(u.createdDate)}</TableCell>
+                                <TableCell><LoginDateCell date={u.lastLoginDate} /></TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
                     )}
                   </CardContent>
                 </Card>
@@ -439,61 +493,63 @@ const Index = () => {
           </Tabs>
 
           {/* Data Table */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-5">
               <div className="space-y-1">
                 <CardTitle className="text-base">User Licenses</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Showing {Math.min(currentPage * ROWS_PER_PAGE + 1, filteredUsers.length)}–{Math.min((currentPage + 1) * ROWS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length.toLocaleString()} records
+                <p className="text-sm text-muted-foreground">
+                  Showing <span className="font-medium text-foreground">{Math.min(currentPage * ROWS_PER_PAGE + 1, filteredUsers.length).toLocaleString()}–{Math.min((currentPage + 1) * ROWS_PER_PAGE, filteredUsers.length).toLocaleString()}</span> of <span className="font-medium text-foreground">{filteredUsers.length.toLocaleString()}</span> records
                 </p>
               </div>
-              <div className="relative w-64">
+              <div className="relative w-72">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm" />
+                <Input placeholder="Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
               </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Profile</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>License Age</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No users found matching your filters.
-                      </TableCell>
+            <CardContent className="px-5 pb-5">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Profile</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>License Age</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ) : (
-                    paginatedUsers.map((u) => {
-                      const days = getDaysSinceLogin(u.lastLoginDate);
-                      const status = getLoginStatus(days);
-                      return (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.name}</TableCell>
-                          <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                          <TableCell>{u.profileName}</TableCell>
-                          <TableCell>{u.roleName || <span className="text-muted-foreground italic">—</span>}</TableCell>
-                          <TableCell>{formatLicenseAge(u.createdDate)}</TableCell>
-                          <TableCell><LoginDateCell date={u.lastLoginDate} /></TableCell>
-                          <TableCell><StatusBadge status={status} /></TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                          No users found matching your filters.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedUsers.map((u, i) => {
+                        const days = getDaysSinceLogin(u.lastLoginDate);
+                        const status = getLoginStatus(days);
+                        return (
+                          <TableRow key={u.id} className={i % 2 === 0 ? "bg-muted/20" : ""}>
+                            <TableCell className="font-medium">{u.name}</TableCell>
+                            <TableCell className="text-muted-foreground max-w-[200px] truncate">{u.email}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{u.profileName}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{u.roleName || <span className="text-muted-foreground italic">—</span>}</TableCell>
+                            <TableCell className="tabular-nums">{formatLicenseAge(u.createdDate)}</TableCell>
+                            <TableCell><LoginDateCell date={u.lastLoginDate} /></TableCell>
+                            <TableCell><StatusBadge status={status} /></TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-xs text-muted-foreground">Page {currentPage + 1} of {totalPages}</p>
+                  <p className="text-sm text-muted-foreground">Page <span className="font-medium text-foreground">{currentPage + 1}</span> of <span className="font-medium text-foreground">{totalPages}</span></p>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
                       Previous
@@ -506,7 +562,7 @@ const Index = () => {
               )}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </DashboardLayout>
   );
