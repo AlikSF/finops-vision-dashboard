@@ -12,6 +12,7 @@ import { ProfileAnalysisTab } from "./ProfileAnalysisTab";
 import { RoleAnalysisTab } from "./RoleAnalysisTab";
 import { ActivityAnalysisTab } from "./ActivityAnalysisTab";
 import { UserDetailTab } from "./UserDetailTab";
+import { SalesforceInsightsTab } from "./SalesforceInsightsTab";
 import type { EnrichedUser, UserLicensePool, LoginRecord, PSLPool } from "@/data/dataModels";
 
 const STATUS_COLORS: Record<string, string> = {
