@@ -3,9 +3,9 @@ import { get, set, del } from "idb-keyval";
 import { toast } from "@/hooks/use-toast";
 import type {
   RawUser, LoginRecord, UserLicensePool, PSLPool, PSLAssignment,
-  EnrichedUser, CategoryRule, DataSnapshot, FileType,
+  EnrichedUser, CategoryRule, ProfileTeamMapping, DataSnapshot, FileType,
 } from "@/data/dataModels";
-import { DEFAULT_RULES } from "@/data/categoryRules";
+import { DEFAULT_RULES, DEFAULT_TEAM_MAPPINGS } from "@/data/categoryRules";
 import { joinData } from "@/data/dataJoiner";
 import {
   parseUsersMaster, parseLoginHistory, parseUserLicensePool,
@@ -22,6 +22,7 @@ export function useDataStore() {
   const [pslPool, setPslPool] = useState<PSLPool[]>([]);
   const [pslAssignments, setPslAssignments] = useState<PSLAssignment[]>([]);
   const [categoryRules, setCategoryRules] = useState<CategoryRule[]>(DEFAULT_RULES);
+  const [teamMappings, setTeamMappings] = useState<ProfileTeamMapping[]>(DEFAULT_TEAM_MAPPINGS);
   const [snapshots, setSnapshots] = useState<DataSnapshot[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<Record<FileType, { name: string; count: number; timestamp: string } | null>>({
     users_master: null,
@@ -36,13 +37,14 @@ export function useDataStore() {
   useEffect(() => {
     (async () => {
       try {
-        const [u, lh, ulp, pp, pa, rules, snaps, files] = await Promise.all([
+        const [u, lh, ulp, pp, pa, rules, mappings, snaps, files] = await Promise.all([
           get<RawUser[]>(key("users")),
           get<LoginRecord[]>(key("login_history")),
           get<UserLicensePool[]>(key("user_license_pool")),
           get<PSLPool[]>(key("psl_pool")),
           get<PSLAssignment[]>(key("psl_assignments")),
           get<CategoryRule[]>(key("category_rules")),
+          get<ProfileTeamMapping[]>(key("team_mappings")),
           get<DataSnapshot[]>(key("snapshots")),
           get<typeof uploadedFiles>(key("uploaded_files")),
         ]);
@@ -52,6 +54,7 @@ export function useDataStore() {
         if (pp) setPslPool(pp);
         if (pa) setPslAssignments(pa);
         if (rules) setCategoryRules(rules);
+        if (mappings) setTeamMappings(mappings);
         if (snaps) setSnapshots(snaps);
         if (files) setUploadedFiles(files);
       } catch {
@@ -60,11 +63,11 @@ export function useDataStore() {
     })();
   }, []);
 
-  // Enriched users - recomputed whenever source data or rules change
+  // Enriched users
   const enrichedUsers = useMemo(() => {
     if (users.length === 0) return [];
-    return joinData(users, loginHistory, pslAssignments, pslPool, categoryRules);
-  }, [users, loginHistory, pslAssignments, pslPool, categoryRules]);
+    return joinData(users, loginHistory, pslAssignments, pslPool, categoryRules, teamMappings);
+  }, [users, loginHistory, pslAssignments, pslPool, categoryRules, teamMappings]);
 
   const uploadFile = useCallback(async (file: File, forcedType?: FileType) => {
     setIsProcessing(true);
@@ -138,6 +141,11 @@ export function useDataStore() {
     await set(key("category_rules"), rules);
   }, []);
 
+  const updateTeamMappings = useCallback(async (mappings: ProfileTeamMapping[]) => {
+    setTeamMappings(mappings);
+    await set(key("team_mappings"), mappings);
+  }, []);
+
   const saveSnapshot = useCallback(async () => {
     const snap: DataSnapshot = {
       id: crypto.randomUUID(),
@@ -145,7 +153,6 @@ export function useDataStore() {
       fileTypes: Object.entries(uploadedFiles).filter(([, v]) => v).map(([k]) => k),
       userCount: enrichedUsers.length,
     };
-    // Save enriched users under snapshot ID
     await set(key(`snap-${snap.id}`), enrichedUsers);
     const newSnaps = [...snapshots, snap];
     setSnapshots(newSnaps);
@@ -164,6 +171,7 @@ export function useDataStore() {
     setPslPool([]);
     setPslAssignments([]);
     setCategoryRules(DEFAULT_RULES);
+    setTeamMappings(DEFAULT_TEAM_MAPPINGS);
     setUploadedFiles({
       users_master: null, login_history: null,
       user_license_pool: null, psl_pool: null, psl_assignments: null,
@@ -172,14 +180,14 @@ export function useDataStore() {
       del(key("users")), del(key("login_history")),
       del(key("user_license_pool")), del(key("psl_pool")),
       del(key("psl_assignments")), del(key("category_rules")),
-      del(key("uploaded_files")),
+      del(key("team_mappings")), del(key("uploaded_files")),
     ]);
   }, []);
 
   return {
     users, loginHistory, userLicensePool, pslPool, pslAssignments,
-    enrichedUsers, categoryRules, snapshots, uploadedFiles, isProcessing,
-    uploadFile, updateCategoryRules, saveSnapshot, loadSnapshotUsers,
+    enrichedUsers, categoryRules, teamMappings, snapshots, uploadedFiles, isProcessing,
+    uploadFile, updateCategoryRules, updateTeamMappings, saveSnapshot, loadSnapshotUsers,
     clearAllData,
   };
 }

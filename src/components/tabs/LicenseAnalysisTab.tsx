@@ -24,10 +24,16 @@ export function LicenseAnalysisTab({ users, licensePool, pslPool }: LicenseAnaly
     }))
     .sort((a, b) => b.used - a.used);
 
-  // Waste by license type (exclude Automated/System & Integration)
+  // Waste by license type — only internal human users
   const wasteMap = new Map<string, { ghost: number; neverUsed: number }>();
   users.forEach(u => {
-    if (u.derivedCategory === "Automated/System" || u.derivedCategory === "Integration") return;
+    if (
+      u.derivedCategory === "Automated/System" ||
+      u.derivedCategory === "Integration/Technical" ||
+      u.derivedCategory === "ePortal B2C" ||
+      u.derivedCategory === "ePortal B2B" ||
+      u.derivedCategory === "External/Community Other"
+    ) return;
     if (u.usageStatus !== "Ghost" && u.usageStatus !== "Never Used") return;
     const existing = wasteMap.get(u.licenseName) || { ghost: 0, neverUsed: 0 };
     if (u.usageStatus === "Ghost") existing.ghost++;
@@ -52,7 +58,6 @@ export function LicenseAnalysisTab({ users, licensePool, pslPool }: LicenseAnaly
 
   return (
     <div className="space-y-6">
-      {/* Primary License Pool Table */}
       {primaryData.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
@@ -89,11 +94,10 @@ export function LicenseAnalysisTab({ users, licensePool, pslPool }: LicenseAnaly
         </Card>
       )}
 
-      {/* Waste by License Type */}
       {wasteData.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Estimated Waste by License Type (excl. System & Integration)</CardTitle>
+            <CardTitle className="text-sm font-semibold">Estimated Waste by License Type (Internal Users Only)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={Math.max(300, wasteData.length * 35)}>
@@ -110,7 +114,6 @@ export function LicenseAnalysisTab({ users, licensePool, pslPool }: LicenseAnaly
         </Card>
       )}
 
-      {/* Add-on License Pool */}
       {pslData.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
