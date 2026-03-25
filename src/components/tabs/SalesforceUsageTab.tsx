@@ -126,6 +126,7 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="profile">By Profile</TabsTrigger>
           <TabsTrigger value="role">By Role</TabsTrigger>
           <TabsTrigger value="team">By Team/Function</TabsTrigger>
