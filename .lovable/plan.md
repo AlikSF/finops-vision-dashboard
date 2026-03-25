@@ -1,58 +1,60 @@
 
 
-# Enhanced License & User Visibility for Salesforce Admin Decision-Making
+# Fix: Show All 282 Users in Salesforce Tab
 
-## What This Solves
+## Root Cause Analysis
 
-Right now, the License Usage tab shows pool-level numbers and breakdown summaries, but you cannot see **which specific users** hold a given license or add-on, their usage status, or identify who to deactivate. The Salesforce Usage tab also lacks per-user license detail (which add-ons each user has). This plan adds the drill-down views a senior admin needs.
+The pipeline filters users at multiple stages. The most likely causes of only 16 users showing:
 
-## Changes
+1. **`findCol` is case-sensitive** — if CSV headers don't exactly match (e.g. `"profile.userlicense.name"` vs `"Profile.UserLicense.Name"`), the license column won't be found, OR it matches but most users have community license values
+2. **Community license filter** in `Index.tsx` splits users — if most of the 282 users have `licenseName` = "Customer Community Login" or "Customer Community Plus Login", they go to the Community tab instead
+3. **System/Integration exclusion** — the default toggle in `SalesforceUsageTab` excludes Automated/System and Integration/Technical users
 
-### 1. License Usage Tab -- Add Full User List to Add-on Adoption Detail
+## Plan
 
-**File**: `src/components/tabs/LicenseUsageTab.tsx`
+### 1. Make `findCol` case-insensitive (`src/data/csvParsers.ts`)
 
-Currently Section C shows KPI cards and breakdown tables. Add below them:
+Change `findCol` to do case-insensitive, whitespace-normalized key matching (like `findHeader` in `userData.ts` already does). This ensures license, profile, and role columns are found regardless of header casing.
 
-- **Searchable user table** for the selected add-on license showing: Name, Profile, Role, Team/Function, Usage Status (color-coded badge), Last Login, Logins (30d), Days Since Login
-- Sort by days since login descending (worst offenders first)
-- Search input to filter by name/profile/role
-- Status filter dropdown (All / Active / At Risk / Ghost / Never Used) so admins can quickly isolate ghost users holding that add-on
-- Row count in header: "Users with CRM Analytics (47)"
+### 2. Add debug logging to data pipeline (`src/hooks/useDataStore.ts`)
 
-### 2. License Usage Tab -- Make Primary License Pool Clickable
+After computing `enrichedUsers`, log:
+- Total parsed users count
+- Breakdown by `licenseName` (how many per license type)
+- Breakdown by `derivedCategory`
 
-**File**: `src/components/tabs/LicenseUsageTab.tsx`
+This will appear in the browser console so the user (and we) can see exactly where users are going.
 
-- Make each row in the Primary License Pool table clickable
-- When clicked, show an expandable section (or inline panel) listing all users with that `licenseName`, with the same columns as above (Name, Profile, Role, Status, Last Login, Logins 30d)
-- This lets admins click "Salesforce" and see 200 users, or click "Customer Community Login" and see 5000 portal users, with their status breakdown
+### 3. Add license breakdown indicator (`src/components/tabs/SalesforceUsageTab.tsx`)
 
-### 3. Salesforce Usage Overview -- Add "Assigned Add-ons" Column
+Add a small info line below the KPI cards showing: "Total parsed: X | SF licenses: Y | Community licenses: Z | Other: W" so it's transparent where users end up.
 
-**File**: `src/components/tabs/SalesforceUsageTab.tsx`
+### 4. Pass total enriched count to SalesforceUsageTab (`src/pages/Index.tsx`)
 
-- Add an "Add-on Licenses" column to the "All Salesforce Users" table showing a comma-separated list of add-ons each user holds (from `u.addOnLicenses`)
-- This gives admins instant visibility into who has CRM Analytics, Sales Cloud Einstein, etc. alongside their usage status
-
-### 4. Salesforce Insights -- Add "Never Used" Users Table
-
-**File**: `src/components/tabs/SalesforceInsightsTab.tsx`
-
-- Add a fourth table: "Never Used Users" (usageStatus === "Never Used") -- these are assigned a license but have literally never logged in
-- Same columns as Ghost table: Name, Profile, Role, Team/Function, Created Date
-- This is a critical deactivation list for admins
+Pass `totalEnrichedCount={enrichedUsers.length}` so the tab can display total vs filtered.
 
 ## Technical Details
 
-- Primary license drill-down uses state `selectedPrimaryLicense: string | null` to toggle an inline user table below the pool table
-- Add-on user table reuses `addOnUsers` array already computed, adds search + status filter via `useState`
-- All tables use existing `Table`, `Badge`, `Input` components
-- No new data/SOQL needed -- all fields exist in current CSVs
+**`findCol` fix** — normalize both row keys and candidate names to lowercase with stripped spaces/underscores before comparing, matching the approach already used in `userData.ts`:
+```ts
+function findCol(row: Record<string, string>, ...candidates: string[]): string {
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, "");
+  const rowKeys = Object.keys(row);
+  for (const c of candidates) {
+    const nc = normalize(c);
+    const match = rowKeys.find(k => normalize(k) === nc);
+    if (match !== undefined) return row[match] || "";
+  }
+  return "";
+}
+```
+
+**Debug logging** — `console.log` after `joinData` showing license distribution, so user can check browser console to see exactly which licenses exist in their CSV.
 
 ## Files Modified
 
-1. `src/components/tabs/LicenseUsageTab.tsx` -- clickable primary pool rows + full user list in add-on detail
-2. `src/components/tabs/SalesforceUsageTab.tsx` -- add "Add-on Licenses" column to overview table
-3. `src/components/tabs/SalesforceInsightsTab.tsx` -- add "Never Used" users table
+1. `src/data/csvParsers.ts` — case-insensitive `findCol`
+2. `src/hooks/useDataStore.ts` — debug logging after enrichment
+3. `src/components/tabs/SalesforceUsageTab.tsx` — show total parsed vs displayed breakdown
+4. `src/pages/Index.tsx` — pass total count prop
 
