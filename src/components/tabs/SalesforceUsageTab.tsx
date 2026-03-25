@@ -37,6 +37,9 @@ interface Props {
 export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistory, hasLoginHistory }: Props) {
   const [includeSystem, setIncludeSystem] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [statusSort, setStatusSort] = useState<"none" | "asc" | "desc">("none");
+
+  const STATUS_ORDER: Record<string, number> = { "Active": 0, "At Risk": 1, "Ghost": 2, "Never Used": 3 };
 
   const safeUsers = users || [];
   const safeAll = allSfUsers || [];
