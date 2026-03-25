@@ -1,79 +1,83 @@
 
 
-# Dynamic CSV-Powered License Optimizer — Plan
+# Enhanced License Optimization Dashboard — Plan
 
-## Overview
-Transform the current hardcoded dashboard into a dynamic, CSV-upload-driven app with localStorage persistence, dark mode, and a sample template download.
+## What's Changing
 
-## Changes
+You'll add **Role** and **CreatedDate** to your CSV export. The dashboard will use **Profile** as the department/team grouping (since that's how INSEAD organizes Salesforce access), and add new analytical views for Role-based and Profile-based usage insights.
 
-### 1. Add PapaParse dependency
-Install `papaparse` for robust CSV parsing (with `@types/papaparse`).
+## New CSV Columns Needed
 
-### 2. New: `src/hooks/useUploadedData.ts` — Data state + localStorage
-- Custom hook managing the uploaded user data via `useState`
-- On mount, hydrate from `localStorage` (key: `license-optimizer-data`)
-- On new upload, parse CSV with PapaParse, map columns to `UserRecord[]`, save to localStorage
-- Store upload timestamp alongside data
-- Expose: `users`, `uploadTimestamp`, `isProcessing`, `handleFileUpload`, `clearData`
+Add these to your Salesforce export:
+- **`UserRole.Name`** — Role in the hierarchy
+- **`CreatedDate`** — When the license was provisioned
 
-### 3. New: `src/components/CsvUploadZone.tsx` — Upload widget
-- Drag-and-drop zone + file picker button, placed in the sidebar
-- Shows "Processing..." spinner during parse
-- Displays "Data freshness" label: "Analysis based on file uploaded at: [timestamp]"
-- "Download Sample Template" link that generates and downloads a CSV with expected columns
+## Data Model Update (`src/data/userData.ts`)
 
-### 4. Update: `src/data/userData.ts`
-- Keep interfaces and helper functions (`computeKPIs`, `getDaysSinceLogin`, `getLoginStatus`, etc.)
-- Remove hardcoded `users` array (or keep as fallback/sample data)
-- Add `parseCSV(csvText: string): UserRecord[]` function that maps CSV columns to the `UserRecord` interface
-- Add `generateSampleCSV(): string` for template download
+Add to `UserRecord`:
+- `roleName: string` — mapped from `UserRole.Name`
+- `createdDate: string | null` — mapped from `CreatedDate`
 
-### 5. Update: `src/components/AppSidebar.tsx`
-- Add the `CsvUploadZone` component below the filters section
-- Show upload timestamp / data freshness label in the footer
+Update `parseCSV` to map these new headers. Add helpers:
+- `getUniqueRoles(data)` — extract distinct roles
+- `getUniqueProfiles(data)` — extract distinct profiles
+- `getLicenseAge(createdDate)` — days since provisioned
+- Update `computeKPIs` to include `activeUsers` count and `utilizationRate` (active / total as %)
 
-### 6. Update: `src/pages/Index.tsx`
-- Use data from `useUploadedData` hook instead of hardcoded import
-- Show an empty/onboarding state when no data is uploaded yet (with prompt to upload CSV)
-- All KPIs, charts, and table already reactive via `useMemo` — just swap data source
+## Sidebar Enhancements (`AppSidebar.tsx`)
 
-### 7. Update: `src/index.css` — Dark mode support
-- Add `.dark` variant CSS variables (dark backgrounds, light text, muted greens)
-- Keep INSEAD brand green as primary in both modes
+Add new filter dropdowns:
+- **Profile filter** (replaces current "Department" conceptually — Profile = team at INSEAD)
+- **Role filter** — filter by Salesforce role
 
-### 8. New: `src/components/ThemeToggle.tsx`
-- Light/dark mode toggle button in the header using `next-themes` (already installed)
+Rename "Department" filter label to "Profile" to match INSEAD's structure.
 
-### 9. Update: `src/components/DashboardLayout.tsx`
-- Wrap app with `ThemeProvider` from `next-themes`
-- Add `ThemeToggle` to header
-- Pass upload handler props through to sidebar
+## Dashboard Enhancements (`Index.tsx`)
 
-### CSV Column Mapping
-Expected columns (flexible matching by header name):
-- `Name` / `FirstName` + `LastName`
-- `Email` / `Username`
-- `Profile Name` / `Profile`
-- `License Name` / `License`  
-- `Department`
-- `Is Active`
-- `Last Login Date`
-- `Federation Id`
+### New KPI Tiles (expand from 4 to 6)
+1. Total Licenses (existing)
+2. Active Users — new, shows count of users logged in within 30 days
+3. Ghost Users (existing)
+4. At-Risk Users (existing)
+5. Utilization Rate — new, percentage badge (active/total)
+6. Est. Wasted Spend (existing)
 
-The parser will do case-insensitive header matching and warn about unmapped columns via a toast.
+### New Charts (use Tabs to organize)
 
-### Data Flow
-```text
-CSV File → PapaParse → Column Mapper → UserRecord[] 
-  → localStorage (persist) 
-  → React state (useUploadedData hook)
-  → Index.tsx useMemo → KPIs, Charts, Table
-```
+**Tab 1 — Overview** (current charts):
+- Pie: License Distribution by Profile
+- Bar: Inactive Users by Profile (rename from "Department")
 
-### Empty State
-When no data exists (first visit, cleared data), show a centered card with:
-- Upload icon + "Upload your Salesforce export to get started"
-- "Download Sample Template" button
-- Brief instructions
+**Tab 2 — Profile Analysis** (new):
+- Horizontal Bar: Users per Profile — shows total, active, ghost stacked
+- Table: Profile summary (profile name, total users, active %, ghost count, estimated waste)
+
+**Tab 3 — Role Analysis** (new):
+- Bar: Users by Role with activity status breakdown
+- Table: Role summary (role name, user count, last login range, utilization %)
+
+**Tab 4 — License Age** (new):
+- Bar: License age distribution (0-30d, 30-90d, 90-180d, 180d-1yr, 1yr+) — helps identify long-held unused licenses
+- Scatter or list: "Oldest ghost licenses" — longest-provisioned users who never/rarely log in
+
+### Table Enhancements
+Add columns:
+- **Role** column
+- **License Age** column (shows "X months" since CreatedDate)
+- Add Role filter to sidebar filters
+
+## Technical Details
+
+- Use shadcn `Tabs` component (already exists) to organize chart sections
+- All new charts use Recharts (already installed)
+- Profile filter added to sidebar alongside existing filters
+- All KPIs and charts remain reactive to all filters
+- `parseCSV` updated to map `UserRole.Name` and `CreatedDate` with flexible header matching
+- Sample CSV template updated to include the new columns
+
+## Files Modified
+1. `src/data/userData.ts` — new fields, helpers, updated parser + template
+2. `src/pages/Index.tsx` — new KPIs, tabbed chart sections, table columns
+3. `src/components/AppSidebar.tsx` — add Profile and Role filter dropdowns
+4. `src/components/DashboardLayout.tsx` — pass new filter props
 
