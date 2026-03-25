@@ -95,7 +95,6 @@ const Index = () => {
   const licenses = useMemo(() => getUniqueLicenses(users), [users]);
 
   const filteredUsers = useMemo(() => {
-    setCurrentPage(0);
     return users.filter((u) => {
       const matchProfile = selectedProfile === "all" || u.profileName === selectedProfile;
       const matchRole = selectedRole === "all" || u.roleName === selectedRole;
@@ -107,6 +106,8 @@ const Index = () => {
       return matchProfile && matchRole && matchLicense && matchSearch;
     });
   }, [users, search, selectedProfile, selectedRole, selectedLicense]);
+
+  useEffect(() => { setCurrentPage(0); }, [filteredUsers]);
 
   const totalPages = Math.ceil(filteredUsers.length / ROWS_PER_PAGE);
   const paginatedUsers = filteredUsers.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
