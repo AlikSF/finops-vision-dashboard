@@ -11,6 +11,7 @@ import { MultiFileUpload } from "@/components/MultiFileUpload";
 import type { FileType } from "@/data/dataModels";
 
 interface AppSidebarProps {
+  activeTab: string;
   categories: string[];
   profiles: string[];
   roles: string[];
@@ -59,13 +60,15 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
 }
 
 export function AppSidebar({
-  categories, profiles, roles, licenses, addOnLicenses, departments,
+  activeTab, categories, profiles, roles, licenses, addOnLicenses, departments,
   selectedCategory, selectedProfile, selectedRole, selectedLicense,
   selectedAddOn, selectedStatus, selectedDepartment,
   onCategoryChange, onProfileChange, onRoleChange, onLicenseChange,
   onAddOnChange, onStatusChange, onDepartmentChange,
   onFileUpload, isProcessing, uploadedFiles, onClearData,
 }: AppSidebarProps) {
+  const showFilters = activeTab !== "license";
+
   return (
     <Sidebar className="border-r-0">
       <SidebarContent className="bg-primary text-primary-foreground">
@@ -101,27 +104,34 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Separator className="bg-primary-foreground/20" />
+        {showFilters && (
+          <>
+            <Separator className="bg-primary-foreground/20" />
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-primary-foreground/60 text-xs uppercase tracking-widest flex items-center gap-1.5">
-            <Filter className="h-3 w-3" />
-            Filters
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="px-2 space-y-3 pb-4">
-            <FilterSelect label="User Category" value={selectedCategory} onChange={onCategoryChange} options={categories} allLabel="All Categories" />
-            <FilterSelect label="Usage Status" value={selectedStatus} onChange={onStatusChange} options={USAGE_STATUSES} allLabel="All Statuses" />
-            <FilterSelect label="Profile" value={selectedProfile} onChange={onProfileChange} options={profiles} allLabel="All Profiles" />
-            <FilterSelect label="Role" value={selectedRole} onChange={onRoleChange} options={roles} allLabel="All Roles" />
-            <FilterSelect label="Primary License" value={selectedLicense} onChange={onLicenseChange} options={licenses} allLabel="All Licenses" />
-            {addOnLicenses.length > 0 && (
-              <FilterSelect label="Add-on License" value={selectedAddOn} onChange={onAddOnChange} options={addOnLicenses} allLabel="All Add-ons" />
-            )}
-            {departments.length > 0 && (
-              <FilterSelect label="Department" value={selectedDepartment} onChange={onDepartmentChange} options={departments} allLabel="All Departments" />
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-primary-foreground/60 text-xs uppercase tracking-widest flex items-center gap-1.5">
+                <Filter className="h-3 w-3" />
+                Filters
+              </SidebarGroupLabel>
+              <SidebarGroupContent className="px-2 space-y-3 pb-4">
+                <FilterSelect label="User Category" value={selectedCategory} onChange={onCategoryChange} options={categories} allLabel="All Categories" />
+                <FilterSelect label="Usage Status" value={selectedStatus} onChange={onStatusChange} options={USAGE_STATUSES} allLabel="All Statuses" />
+                <FilterSelect label="Profile" value={selectedProfile} onChange={onProfileChange} options={profiles} allLabel="All Profiles" />
+                <FilterSelect label="Role" value={selectedRole} onChange={onRoleChange} options={roles} allLabel="All Roles" />
+                {activeTab === "salesforce" && (
+                  <>
+                    {addOnLicenses.length > 0 && (
+                      <FilterSelect label="Add-on License" value={selectedAddOn} onChange={onAddOnChange} options={addOnLicenses} allLabel="All Add-ons" />
+                    )}
+                    {departments.length > 0 && (
+                      <FilterSelect label="Department" value={selectedDepartment} onChange={onDepartmentChange} options={departments} allLabel="All Departments" />
+                    )}
+                  </>
+                )}
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="bg-primary text-primary-foreground/50 text-xs p-4">

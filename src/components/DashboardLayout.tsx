@@ -6,6 +6,7 @@ import type { FileType } from "@/data/dataModels";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  activeTab: string;
   categories: string[];
   profiles: string[];
   roles: string[];
@@ -33,7 +34,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({
-  children, categories, profiles, roles, licenses, addOnLicenses, departments,
+  children, activeTab, categories, profiles, roles, licenses, addOnLicenses, departments,
   selectedCategory, selectedProfile, selectedRole, selectedLicense,
   selectedAddOn, selectedStatus, selectedDepartment,
   onCategoryChange, onProfileChange, onRoleChange, onLicenseChange,
@@ -44,6 +45,7 @@ export function DashboardLayout({
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-muted/30">
         <AppSidebar
+          activeTab={activeTab}
           categories={categories}
           profiles={profiles}
           roles={roles}
