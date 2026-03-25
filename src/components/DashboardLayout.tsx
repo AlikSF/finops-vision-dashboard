@@ -5,11 +5,14 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface DashboardLayoutProps {
   children: ReactNode;
-  departments: string[];
+  profiles: string[];
+  roles: string[];
   licenses: string[];
-  selectedDepartment: string;
+  selectedProfile: string;
+  selectedRole: string;
   selectedLicense: string;
-  onDepartmentChange: (value: string) => void;
+  onProfileChange: (value: string) => void;
+  onRoleChange: (value: string) => void;
   onLicenseChange: (value: string) => void;
   onFileUpload: (file: File) => void;
   isProcessing: boolean;
@@ -18,19 +21,22 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({
-  children, departments, licenses, selectedDepartment, selectedLicense,
-  onDepartmentChange, onLicenseChange, onFileUpload, isProcessing,
+  children, profiles, roles, licenses, selectedProfile, selectedRole, selectedLicense,
+  onProfileChange, onRoleChange, onLicenseChange, onFileUpload, isProcessing,
   uploadTimestamp, onClearData,
 }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-muted/30">
         <AppSidebar
-          departments={departments}
+          profiles={profiles}
+          roles={roles}
           licenses={licenses}
-          selectedDepartment={selectedDepartment}
+          selectedProfile={selectedProfile}
+          selectedRole={selectedRole}
           selectedLicense={selectedLicense}
-          onDepartmentChange={onDepartmentChange}
+          onProfileChange={onProfileChange}
+          onRoleChange={onRoleChange}
           onLicenseChange={onLicenseChange}
           onFileUpload={onFileUpload}
           isProcessing={isProcessing}
