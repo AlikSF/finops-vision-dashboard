@@ -35,7 +35,6 @@ export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) 
   const safeLicensePool = licensePool || [];
   const totalPrimaryLicenses = safeLicensePool.reduce((s, l) => s + l.totalLicenses, 0);
   const usedPrimaryLicenses = safeLicensePool.reduce((s, l) => s + l.usedLicenses, 0);
-  const usedPrimaryLicenses = licensePool.reduce((s, l) => s + l.usedLicenses, 0);
 
   // Waste (exclude Automated/System, Integration/Technical, and external categories)
   const wasteUsers = allUsers.filter(u =>
