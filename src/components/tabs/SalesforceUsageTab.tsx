@@ -97,9 +97,12 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
     .sort((a, b) => b.value - a.value);
 
   // Most active users
-  const topUsers = [...displayUsers]
-    .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0))
-    .slice(0, 10);
+  const allSorted = useMemo(() => {
+    const q = userSearch.toLowerCase();
+    return [...displayUsers]
+      .filter(u => !q || u.name.toLowerCase().includes(q) || u.profileName?.toLowerCase().includes(q) || u.roleName?.toLowerCase().includes(q))
+      .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0));
+  }, [displayUsers, userSearch]);
 
   return (
     <div className="space-y-4">
