@@ -201,6 +201,7 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
                       <TableHead>Profile</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Team/Function</TableHead>
+                      <TableHead>Add-on Licenses</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Logins (30d)</TableHead>
