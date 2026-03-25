@@ -280,7 +280,12 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
                       <TableHead>Role</TableHead>
                       <TableHead>Team/Function</TableHead>
                       <TableHead>Add-on Licenses</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground"
+                        onClick={() => setStatusSort(prev => prev === "none" ? "asc" : prev === "asc" ? "desc" : "none")}
+                      >
+                        Status {statusSort === "asc" ? "▲" : statusSort === "desc" ? "▼" : ""}
+                      </TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Logins (30d)</TableHead>
                     </TableRow>
