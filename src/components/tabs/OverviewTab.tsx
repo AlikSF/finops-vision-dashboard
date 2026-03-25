@@ -17,8 +17,11 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) {
+  const safeUsers = users || [];
+  const safeAllUsers = allUsers || [];
+  
   // KPIs — exclude Automated/System & Integration/Technical from human usage metrics
-  const humanUsers = users.filter(u =>
+  const humanUsers = safeUsers.filter(u =>
     u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical"
   );
 
@@ -29,11 +32,12 @@ export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) 
   const neverUsed = humanUsers.filter(u => u.usageStatus === "Never Used").length;
 
   // License pool stats
-  const totalPrimaryLicenses = licensePool.reduce((s, l) => s + l.totalLicenses, 0);
-  const usedPrimaryLicenses = licensePool.reduce((s, l) => s + l.usedLicenses, 0);
+  const safeLicensePool = licensePool || [];
+  const totalPrimaryLicenses = safeLicensePool.reduce((s, l) => s + l.totalLicenses, 0);
+  const usedPrimaryLicenses = safeLicensePool.reduce((s, l) => s + l.usedLicenses, 0);
 
   // Waste (exclude Automated/System, Integration/Technical, and external categories)
-  const wasteUsers = allUsers.filter(u =>
+  const wasteUsers = safeAllUsers.filter(u =>
     u.derivedCategory !== "Automated/System" &&
     u.derivedCategory !== "Integration/Technical" &&
     u.derivedCategory !== "ePortal B2C" &&
@@ -56,7 +60,7 @@ export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) 
 
   // Category pie
   const categoryData = Object.entries(
-    users.reduce((acc, u) => { acc[u.derivedCategory] = (acc[u.derivedCategory] || 0) + 1; return acc; }, {} as Record<string, number>)
+    safeUsers.reduce((acc, u) => { acc[u.derivedCategory] = (acc[u.derivedCategory] || 0) + 1; return acc; }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   // Status pie — human users only
