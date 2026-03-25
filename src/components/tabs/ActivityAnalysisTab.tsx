@@ -24,6 +24,16 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory, incl
     return users.filter(u => u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical");
   }, [users, includeSystem]);
 
+  if (!hasLoginHistory) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="p-12 text-center">
+          <p className="text-muted-foreground">Upload Login History CSV to see activity analysis.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const activityBuckets = [
     { label: "7 days", key: "logins7d" as const },
     { label: "30 days", key: "logins30d" as const },
