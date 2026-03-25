@@ -1,4 +1,5 @@
 import { differenceInDays } from "date-fns";
+import Papa from "papaparse";
 
 export interface UserRecord {
   id: string;
@@ -14,19 +15,6 @@ export interface UserRecord {
   lastLoginDate: string | null;
   federationId: string;
 }
-
-export const users: UserRecord[] = [
-  { id: "0050o00000XfoX6AAJ", firstName: "Charith", lastName: "MAHAWATTA", name: "Charith MAHAWATTA", email: "charith.mahawatta@insead.edu", username: "charith.mahawatta@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-25T03:49:40.000+0000", federationId: "charith.mahawatta@insead.edu" },
-  { id: "0053X00000AyewQQAR", firstName: "Hamza", lastName: "Belallam", name: "Hamza Belallam", email: "hamza.belallam@insead.edu", username: "hamza.belallam@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-24T14:46:49.000+0000", federationId: "hamza.belallam@insead.edu" },
-  { id: "0053X00000CSVHdQAP", firstName: "IT Data", lastName: "Upload", name: "IT Data Upload", email: "valeed.abdul@insead.edu", username: "integration.salesforce@insead.edu", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-19T06:33:22.000+0000", federationId: "" },
-  { id: "0053X00000CgVNfQAN", firstName: "Valeed", lastName: "Mohammed Abdul", name: "Valeed Mohammed Abdul", email: "valeed.abdul@insead.edu", username: "valeed.abdul@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-18T23:01:48.000+0000", federationId: "valeed.abdul@insead.edu" },
-  { id: "0053X00000DZMG0QAP", firstName: "Varadharaja", lastName: "Perumal", name: "Varadharaja Perumal", email: "varadharaja.perumal@insead.edu", username: "varadharaja.perumal@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-24T04:51:25.000+0000", federationId: "varadharaja.perumal@insead.edu" },
-  { id: "0053X00000EWaIlQAL", firstName: "Blackthorn", lastName: "Service Account", name: "Blackthorn Service Account", email: "svc_bt@insead.edu", username: "blackthorn@insead.edu", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-23T22:45:36.000+0000", federationId: "" },
-  { id: "0053X00000EWcB3QAL", firstName: "Nandhini", lastName: "Subramaniyan", name: "Nandhini Subramaniyan", email: "nandhini.subramaniyan@insead.edu", username: "nandhini.subramaniyan@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-25T03:59:54.000+0000", federationId: "nandhini.subramaniyan@insead.edu" },
-  { id: "0053X00000F0iFpQAJ", firstName: "Mahantesh", lastName: "Halakeri", name: "Mahantesh Halakeri", email: "mahantesh.halakeri@insead.edu", username: "mahantesh.halakeri@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-25T04:36:15.000+0000", federationId: "mahantesh.halakeri@insead.edu" },
-  { id: "0053X00000G6hrFQAR", firstName: "Aalambek", lastName: "Ulukbek", name: "Aalambek Ulukbek", email: "aalambek.ulukbek@insead.edu", username: "aalambek.ulukbek@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-25T08:02:04.000+0000", federationId: "aalambek.ulukbek@insead.edu" },
-  { id: "0053X00000Gv91HQAR", firstName: "Salah Eddine", lastName: "Jari", name: "Salah Eddine Jari", email: "salaheddine.jari@insead.edu", username: "salaheddine.jari@insead.edu.sfdx", profileName: "System Administrator", licenseName: "Salesforce", department: "Technology", isActive: true, lastLoginDate: "2026-03-25T09:17:03.000+0000", federationId: "salaheddine.jari@insead.edu" },
-];
 
 const COST_PER_LICENSE = 150;
 
@@ -68,9 +56,78 @@ export function computeKPIs(filteredUsers: UserRecord[]): DashboardKPIs {
 }
 
 export function getUniqueDepartments(data: UserRecord[]): string[] {
-  return [...new Set(data.map((u) => u.department))];
+  return [...new Set(data.map((u) => u.department).filter(Boolean))];
 }
 
 export function getUniqueLicenses(data: UserRecord[]): string[] {
-  return [...new Set(data.map((u) => u.licenseName))];
+  return [...new Set(data.map((u) => u.licenseName).filter(Boolean))];
+}
+
+// Flexible column mapping
+function findHeader(headers: string[], ...candidates: string[]): string | undefined {
+  const lower = headers.map((h) => h.trim().toLowerCase().replace(/[_\s]+/g, ""));
+  for (const c of candidates) {
+    const idx = lower.indexOf(c.toLowerCase().replace(/[_\s]+/g, ""));
+    if (idx !== -1) return headers[idx];
+  }
+  return undefined;
+}
+
+export function parseCSV(csvText: string): UserRecord[] {
+  const result = Papa.parse<Record<string, string>>(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim(),
+  });
+
+  const headers = result.meta.fields || [];
+
+  const colId = findHeader(headers, "Id", "UserId", "User Id");
+  const colFirstName = findHeader(headers, "FirstName", "First Name", "firstname");
+  const colLastName = findHeader(headers, "LastName", "Last Name", "lastname");
+  const colName = findHeader(headers, "Name", "Full Name", "FullName");
+  const colEmail = findHeader(headers, "Email", "EmailAddress", "Email Address");
+  const colUsername = findHeader(headers, "Username", "User Name");
+  const colProfile = findHeader(headers, "Profile Name", "ProfileName", "Profile");
+  const colLicense = findHeader(headers, "License Name", "LicenseName", "License", "License Type");
+  const colDepartment = findHeader(headers, "Department", "Dept");
+  const colActive = findHeader(headers, "Is Active", "IsActive", "Active");
+  const colLastLogin = findHeader(headers, "Last Login Date", "LastLoginDate", "Last Login", "LastLogin");
+  const colFedId = findHeader(headers, "Federation Id", "FederationId", "Federation ID");
+
+  return result.data.map((row, i) => {
+    const firstName = (colFirstName ? row[colFirstName] : "") || "";
+    const lastName = (colLastName ? row[colLastName] : "") || "";
+    const name = (colName ? row[colName] : "") || `${firstName} ${lastName}`.trim();
+    const activeVal = colActive ? row[colActive]?.toLowerCase() : "true";
+
+    return {
+      id: (colId ? row[colId] : "") || String(i),
+      firstName,
+      lastName,
+      name,
+      email: (colEmail ? row[colEmail] : "") || "",
+      username: (colUsername ? row[colUsername] : "") || "",
+      profileName: (colProfile ? row[colProfile] : "") || "",
+      licenseName: (colLicense ? row[colLicense] : "") || "Salesforce",
+      department: (colDepartment ? row[colDepartment] : "") || "",
+      isActive: activeVal === "true" || activeVal === "yes" || activeVal === "1",
+      lastLoginDate: (colLastLogin ? row[colLastLogin] : "") || null,
+      federationId: (colFedId ? row[colFedId] : "") || "",
+    };
+  });
+}
+
+export function generateSampleCSV(): string {
+  const headers = [
+    "Id", "First Name", "Last Name", "Name", "Email", "Username",
+    "Profile Name", "License Name", "Department", "Is Active",
+    "Last Login Date", "Federation Id",
+  ];
+  const sampleRow = [
+    "001ABC", "Jane", "Doe", "Jane Doe", "jane.doe@company.com", "jane.doe@company.com.sfdx",
+    "System Administrator", "Salesforce", "Technology", "true",
+    "2025-12-15T10:30:00.000+0000", "jane.doe@company.com",
+  ];
+  return [headers.join(","), sampleRow.join(",")].join("\n");
 }
