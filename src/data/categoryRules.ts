@@ -9,7 +9,8 @@ export const DEFAULT_RULES: CategoryRule[] = [
   // 1. Automated/System
   { id: ruleId(), priority: 1, category: "Automated/System", field: "name", operator: "equals", value: "Automated Process" },
   { id: ruleId(), priority: 2, category: "Automated/System", field: "userType", operator: "contains", value: "AutomatedProcess" },
-  { id: ruleId(), priority: 3, category: "Automated/System", field: "username", operator: "regex", value: "autoproc|noreply|service|bot" },
+  { id: ruleId(), priority: 3, category: "Automated/System", field: "name", operator: "regex", value: "Site Guest User" },
+  { id: ruleId(), priority: 4, category: "Automated/System", field: "username", operator: "regex", value: "autoproc|noreply|service|bot" },
 
   // 2. Integration/Technical
   { id: ruleId(), priority: 10, category: "Integration/Technical", field: "profileName", operator: "contains", value: "Integration" },
