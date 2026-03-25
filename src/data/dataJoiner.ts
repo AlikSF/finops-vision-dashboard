@@ -1,9 +1,9 @@
 import { differenceInDays } from "date-fns";
 import type {
   RawUser, LoginRecord, PSLAssignment, PSLPool,
-  EnrichedUser, UsageStatus, CategoryRule,
+  EnrichedUser, UsageStatus, CategoryRule, ProfileTeamMapping,
 } from "./dataModels";
-import { deriveCategory } from "./categoryRules";
+import { deriveCategory, deriveTeamFunction } from "./categoryRules";
 
 const NOW = () => new Date();
 
@@ -26,6 +26,7 @@ export function joinData(
   pslAssignments: PSLAssignment[],
   pslPool: PSLPool[],
   rules: CategoryRule[],
+  teamMappings: ProfileTeamMapping[],
 ): EnrichedUser[] {
   const now = NOW();
   const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
@@ -51,7 +52,7 @@ export function joinData(
     }
   }
 
-  // Build add-on license map: userId -> license names[]
+  // Build add-on license map
   const pslPoolMap = new Map<string, string>();
   for (const p of pslPool) {
     pslPoolMap.set(p.id, p.masterLabel);
@@ -66,14 +67,18 @@ export function joinData(
     }
   }
 
-  return users.map((u) => ({
-    ...u,
-    derivedCategory: deriveCategory(u, rules),
-    usageStatus: computeUsageStatus(u.lastLoginDate),
-    logins7d: loginCounts7.get(u.id) || 0,
-    logins30d: loginCounts30.get(u.id) || 0,
-    logins90d: loginCounts90.get(u.id) || 0,
-    addOnLicenses: userAddOns.get(u.id) || [],
-    daysSinceLogin: daysSince(u.lastLoginDate),
-  }));
+  return users.map((u) => {
+    const category = deriveCategory(u, rules);
+    return {
+      ...u,
+      derivedCategory: category,
+      derivedTeamFunction: deriveTeamFunction(u.profileName, category, teamMappings),
+      usageStatus: computeUsageStatus(u.lastLoginDate),
+      logins7d: loginCounts7.get(u.id) || 0,
+      logins30d: loginCounts30.get(u.id) || 0,
+      logins90d: loginCounts90.get(u.id) || 0,
+      addOnLicenses: userAddOns.get(u.id) || [],
+      daysSinceLogin: daysSince(u.lastLoginDate),
+    };
+  });
 }

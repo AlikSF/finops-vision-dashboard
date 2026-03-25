@@ -12,30 +12,35 @@ const COLORS = [
 
 interface OverviewTabProps {
   users: EnrichedUser[];
+  allUsers: EnrichedUser[];
   licensePool: UserLicensePool[];
 }
 
-export function OverviewTab({ users, licensePool }: OverviewTabProps) {
-  // KPIs
-  const totalActive = users.filter(u => u.isActive).length;
-  const active30 = users.filter(u => u.usageStatus === "Active").length;
-  const atRisk = users.filter(u => u.usageStatus === "At Risk").length;
-  const ghost = users.filter(u => u.usageStatus === "Ghost").length;
-  const neverUsed = users.filter(u => u.usageStatus === "Never Used").length;
+export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) {
+  // KPIs — exclude Automated/System & Integration/Technical from human usage metrics
+  const humanUsers = users.filter(u =>
+    u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical"
+  );
+
+  const totalActive = humanUsers.filter(u => u.isActive).length;
+  const active30 = humanUsers.filter(u => u.usageStatus === "Active").length;
+  const atRisk = humanUsers.filter(u => u.usageStatus === "At Risk").length;
+  const ghost = humanUsers.filter(u => u.usageStatus === "Ghost").length;
+  const neverUsed = humanUsers.filter(u => u.usageStatus === "Never Used").length;
 
   // License pool stats
   const totalPrimaryLicenses = licensePool.reduce((s, l) => s + l.totalLicenses, 0);
   const usedPrimaryLicenses = licensePool.reduce((s, l) => s + l.usedLicenses, 0);
 
-  // Waste (exclude Automated/System & Integration)
-  const wasteUsers = users.filter(u =>
-    u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration" &&
+  // Waste (exclude Automated/System, Integration/Technical, and external categories)
+  const wasteUsers = allUsers.filter(u =>
+    u.derivedCategory !== "Automated/System" &&
+    u.derivedCategory !== "Integration/Technical" &&
+    u.derivedCategory !== "ePortal B2C" &&
+    u.derivedCategory !== "ePortal B2B" &&
+    u.derivedCategory !== "External/Community Other" &&
     (u.usageStatus === "Ghost" || u.usageStatus === "Never Used")
   );
-  const wasteByLicense = new Map<string, number>();
-  wasteUsers.forEach(u => {
-    wasteByLicense.set(u.licenseName, (wasteByLicense.get(u.licenseName) || 0) + 1);
-  });
 
   const kpis = [
     { label: "Total Active Users", value: totalActive, color: "text-foreground" },
@@ -43,10 +48,10 @@ export function OverviewTab({ users, licensePool }: OverviewTabProps) {
     { label: "At Risk (31-90 days)", value: atRisk, color: "text-yellow-600" },
     { label: "Ghost (>90 days)", value: ghost, color: "text-red-600" },
     { label: "Never Used", value: neverUsed, color: "text-muted-foreground" },
-    { label: "Utilization Rate", value: `${users.length > 0 ? Math.round((active30 / users.length) * 100) : 0}%`, color: "text-foreground" },
+    { label: "Utilization Rate", value: `${humanUsers.length > 0 ? Math.round((active30 / humanUsers.length) * 100) : 0}%`, color: "text-foreground" },
     { label: "Total Primary Licenses", value: totalPrimaryLicenses, color: "text-foreground" },
     { label: "Used Primary Licenses", value: usedPrimaryLicenses, color: "text-foreground" },
-    { label: "Est. Wasted Licenses", value: wasteUsers.length, color: "text-destructive" },
+    { label: "Est. Wasted (Internal)", value: wasteUsers.length, color: "text-destructive" },
   ];
 
   // Category pie
@@ -54,15 +59,15 @@ export function OverviewTab({ users, licensePool }: OverviewTabProps) {
     users.reduce((acc, u) => { acc[u.derivedCategory] = (acc[u.derivedCategory] || 0) + 1; return acc; }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
-  // Status pie
+  // Status pie — human users only
   const statusData = Object.entries(
-    users.reduce((acc, u) => { acc[u.usageStatus] = (acc[u.usageStatus] || 0) + 1; return acc; }, {} as Record<string, number>)
+    humanUsers.reduce((acc, u) => { acc[u.usageStatus] = (acc[u.usageStatus] || 0) + 1; return acc; }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
 
-  // Top profiles bar
-  const profileCounts = Object.entries(
-    users.reduce((acc, u) => { const p = u.profileName || "Unknown"; acc[p] = (acc[p] || 0) + 1; return acc; }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
+  // Team/Function bar
+  const teamCounts = Object.entries(
+    humanUsers.reduce((acc, u) => { const t = u.derivedTeamFunction || "Other"; acc[t] = (acc[t] || 0) + 1; return acc; }, {} as Record<string, number>)
+  ).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, count]) => ({ name, count }));
 
   return (
     <div className="space-y-6">
@@ -113,7 +118,7 @@ export function OverviewTab({ users, licensePool }: OverviewTabProps) {
         {/* Usage Status Distribution */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Usage Status Distribution</CardTitle>
+            <CardTitle className="text-sm font-semibold">Usage Status (Human Users)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
@@ -153,15 +158,15 @@ export function OverviewTab({ users, licensePool }: OverviewTabProps) {
         </Card>
       </div>
 
-      {/* Top Profiles Bar */}
-      {profileCounts.length > 0 && (
+      {/* Team / Function bar */}
+      {teamCounts.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Top 10 Profiles by User Count</CardTitle>
+            <CardTitle className="text-sm font-semibold">Users by Team / Function (Human Users)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={380}>
-              <BarChart data={profileCounts} layout="vertical" margin={{ left: 180 }}>
+              <BarChart data={teamCounts} layout="vertical" margin={{ left: 180 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />

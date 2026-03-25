@@ -34,7 +34,8 @@ export function UserDetailTab({ users, hasLoginHistory }: UserDetailTabProps) {
       u.email.toLowerCase().includes(s) ||
       u.profileName.toLowerCase().includes(s) ||
       u.roleName.toLowerCase().includes(s) ||
-      u.derivedCategory.toLowerCase().includes(s)
+      u.derivedCategory.toLowerCase().includes(s) ||
+      u.derivedTeamFunction.toLowerCase().includes(s)
     );
   }, [users, search]);
 
@@ -79,6 +80,7 @@ export function UserDetailTab({ users, hasLoginHistory }: UserDetailTabProps) {
                 <TableHead className="text-xs">Created</TableHead>
                 <TableHead className="text-xs">Last Login</TableHead>
                 <TableHead className="text-xs">Category</TableHead>
+                <TableHead className="text-xs">Team</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 {hasLoginHistory && (
                   <>
@@ -106,6 +108,9 @@ export function UserDetailTab({ users, hasLoginHistory }: UserDetailTabProps) {
                   <TableCell className="text-xs">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.derivedCategory}</Badge>
                   </TableCell>
+                  <TableCell className="text-xs">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.derivedTeamFunction}</Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[u.usageStatus] || ""}`}>{u.usageStatus}</Badge>
                   </TableCell>
@@ -122,7 +127,6 @@ export function UserDetailTab({ users, hasLoginHistory }: UserDetailTabProps) {
           </Table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-3">
             <p className="text-xs text-muted-foreground">

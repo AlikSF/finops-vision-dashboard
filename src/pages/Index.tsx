@@ -15,12 +15,12 @@ import { UserDetailTab } from "@/components/tabs/UserDetailTab";
 const Index = () => {
   const store = useDataStore();
   const {
-    enrichedUsers, userLicensePool, pslPool, loginHistory,
+    enrichedUsers, users, userLicensePool, pslPool, loginHistory,
     categoryRules, updateCategoryRules, uploadFile, clearAllData,
     uploadedFiles, isProcessing, saveSnapshot,
   } = store;
 
-  // Filters
+  // Filters — default to Internal Business User
   const [selectedCategory, setSelectedCategory] = useState<string>("Internal Business User");
   const [selectedProfile, setSelectedProfile] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
@@ -122,7 +122,7 @@ const Index = () => {
               Showing <strong>{filteredUsers.length}</strong> of {enrichedUsers.length} users
             </p>
             <div className="flex gap-2">
-              <CategoryRuleEditor rules={categoryRules} onSave={updateCategoryRules} />
+              <CategoryRuleEditor rules={categoryRules} onSave={updateCategoryRules} rawUsers={users} />
               <Button variant="outline" size="sm" onClick={saveSnapshot} className="gap-1.5">
                 <Save className="h-3.5 w-3.5" /> Save Snapshot
               </Button>
@@ -140,7 +140,7 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="overview">
-              <OverviewTab users={filteredUsers} licensePool={userLicensePool} />
+              <OverviewTab users={filteredUsers} allUsers={enrichedUsers} licensePool={userLicensePool} />
             </TabsContent>
             <TabsContent value="license">
               <LicenseAnalysisTab users={filteredUsers} licensePool={userLicensePool} pslPool={pslPool} />

@@ -52,10 +52,35 @@ export interface PSLAssignment {
 }
 
 export type UsageStatus = "Active" | "At Risk" | "Ghost" | "Never Used";
-export type UserCategory = "Automated/System" | "Integration" | "Admin" | "External/Community" | "Internal Business User" | "Other";
+export type UserCategory =
+  | "Automated/System"
+  | "Integration/Technical"
+  | "Internal Admin"
+  | "ePortal B2C"
+  | "ePortal B2B"
+  | "External/Community Other"
+  | "Internal Business User"
+  | "Other";
+
+export type TeamFunction =
+  | "DP"
+  | "EDP"
+  | "CSP / Sales"
+  | "Programme / Student-facing"
+  | "Marketing / Data"
+  | "Finance / Operations"
+  | "Management"
+  | "Platform / Technical"
+  | "ePortal B2C"
+  | "ePortal B2B"
+  | "Admin"
+  | "System / Automated"
+  | "External / Community"
+  | "Other";
 
 export interface EnrichedUser extends RawUser {
   derivedCategory: UserCategory;
+  derivedTeamFunction: TeamFunction;
   usageStatus: UsageStatus;
   logins7d: number;
   logins30d: number;
@@ -71,6 +96,11 @@ export interface CategoryRule {
   field: "name" | "username" | "email" | "profileName" | "userType";
   operator: "contains" | "equals" | "regex";
   value: string;
+}
+
+export interface ProfileTeamMapping {
+  profilePattern: string;
+  teamFunction: TeamFunction;
 }
 
 export interface DataSnapshot {
