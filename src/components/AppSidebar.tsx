@@ -1,23 +1,13 @@
 import { LayoutDashboard, Users, Filter } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarFooter,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter,
 } from "@/components/ui/sidebar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { CsvUploadZone } from "@/components/CsvUploadZone";
 
 interface AppSidebarProps {
   departments: string[];
@@ -26,15 +16,16 @@ interface AppSidebarProps {
   selectedLicense: string;
   onDepartmentChange: (value: string) => void;
   onLicenseChange: (value: string) => void;
+  onFileUpload: (file: File) => void;
+  isProcessing: boolean;
+  uploadTimestamp: string | null;
+  onClearData: () => void;
 }
 
 export function AppSidebar({
-  departments,
-  licenses,
-  selectedDepartment,
-  selectedLicense,
-  onDepartmentChange,
-  onLicenseChange,
+  departments, licenses, selectedDepartment, selectedLicense,
+  onDepartmentChange, onLicenseChange, onFileUpload, isProcessing,
+  uploadTimestamp, onClearData,
 }: AppSidebarProps) {
   return (
     <Sidebar className="border-r-0">
@@ -58,6 +49,22 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <Separator className="bg-primary-foreground/20" />
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-primary-foreground/60 text-xs uppercase tracking-widest">
+            Upload Data
+          </SidebarGroupLabel>
+          <SidebarGroupContent className="px-2">
+            <CsvUploadZone
+              onFileUpload={onFileUpload}
+              isProcessing={isProcessing}
+              uploadTimestamp={uploadTimestamp}
+              onClear={onClearData}
+            />
           </SidebarGroupContent>
         </SidebarGroup>
 
@@ -102,7 +109,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="bg-primary text-primary-foreground/50 text-xs p-4">
-        License Optimization v1.0
+        License Optimization v2.0
       </SidebarFooter>
     </Sidebar>
   );
