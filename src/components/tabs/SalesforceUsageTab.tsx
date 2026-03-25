@@ -201,6 +201,7 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
                       <TableHead>Profile</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Team/Function</TableHead>
+                      <TableHead>Add-on Licenses</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Logins (30d)</TableHead>
@@ -213,6 +214,9 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
                         <TableCell className="text-xs">{u.profileName}</TableCell>
                         <TableCell className="text-xs">{u.roleName || "—"}</TableCell>
                         <TableCell className="text-xs">{u.derivedTeamFunction}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate" title={(u.addOnLicenses || []).join(", ")}>
+                          {(u.addOnLicenses || []).length > 0 ? (u.addOnLicenses || []).join(", ") : "—"}
+                        </TableCell>
                         <TableCell className="text-xs">
                           <Badge
                             variant="outline"

@@ -66,6 +66,12 @@ export function SalesforceInsightsTab({ users }: Props) {
     [users],
   );
 
+  // Never Used users
+  const neverUsedUsers = useMemo(
+    () => users.filter(u => u.usageStatus === "Never Used"),
+    [users],
+  );
+
   // Admin users
   const adminUsers = useMemo(
     () => users.filter(u => u.derivedCategory === "Internal Admin"),
@@ -172,6 +178,48 @@ export function SalesforceInsightsTab({ users }: Props) {
                 ))}
                 {ghostUsers.length === 0 && (
                   <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">No ghost users</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Never Used Users */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">
+            Never Used Users ({neverUsedUsers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md overflow-auto max-h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Profile</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Team / Function</TableHead>
+                  <TableHead>Created Date</TableHead>
+                  <TableHead>Add-on Licenses</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {neverUsedUsers.map(u => (
+                  <TableRow key={u.id}>
+                    <TableCell className="text-xs font-medium">{u.name}</TableCell>
+                    <TableCell className="text-xs">{u.profileName}</TableCell>
+                    <TableCell className="text-xs">{u.roleName || "—"}</TableCell>
+                    <TableCell className="text-xs">{u.derivedTeamFunction || "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      {u.createdDate ? format(parseISO(u.createdDate), "MMM d, yyyy") : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">{(u.addOnLicenses || []).join(", ") || "—"}</TableCell>
+                  </TableRow>
+                ))}
+                {neverUsedUsers.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">No never-used users</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
