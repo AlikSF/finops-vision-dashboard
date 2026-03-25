@@ -10,11 +10,14 @@ import { Separator } from "@/components/ui/separator";
 import { CsvUploadZone } from "@/components/CsvUploadZone";
 
 interface AppSidebarProps {
-  departments: string[];
+  profiles: string[];
+  roles: string[];
   licenses: string[];
-  selectedDepartment: string;
+  selectedProfile: string;
+  selectedRole: string;
   selectedLicense: string;
-  onDepartmentChange: (value: string) => void;
+  onProfileChange: (value: string) => void;
+  onRoleChange: (value: string) => void;
   onLicenseChange: (value: string) => void;
   onFileUpload: (file: File) => void;
   isProcessing: boolean;
@@ -23,8 +26,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({
-  departments, licenses, selectedDepartment, selectedLicense,
-  onDepartmentChange, onLicenseChange, onFileUpload, isProcessing,
+  profiles, roles, licenses, selectedProfile, selectedRole, selectedLicense,
+  onProfileChange, onRoleChange, onLicenseChange, onFileUpload, isProcessing,
   uploadTimestamp, onClearData,
 }: AppSidebarProps) {
   return (
@@ -77,15 +80,29 @@ export function AppSidebar({
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-2 space-y-3">
             <div>
-              <label className="text-xs text-primary-foreground/70 mb-1 block">Department</label>
-              <Select value={selectedDepartment} onValueChange={onDepartmentChange}>
+              <label className="text-xs text-primary-foreground/70 mb-1 block">Profile</label>
+              <Select value={selectedProfile} onValueChange={onProfileChange}>
                 <SelectTrigger className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground text-xs h-8">
-                  <SelectValue placeholder="All Departments" />
+                  <SelectValue placeholder="All Profiles" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  <SelectItem value="all">All Profiles</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-primary-foreground/70 mb-1 block">Role</label>
+              <Select value={selectedRole} onValueChange={onRoleChange}>
+                <SelectTrigger className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground text-xs h-8">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
