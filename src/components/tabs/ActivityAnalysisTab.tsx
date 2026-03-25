@@ -18,16 +18,6 @@ interface ActivityAnalysisTabProps {
 }
 
 export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory, includeSystem = false }: ActivityAnalysisTabProps) {
-  if (!hasLoginHistory) {
-    return (
-      <Card className="shadow-sm">
-        <CardContent className="p-12 text-center">
-          <p className="text-muted-foreground">Upload Login History CSV to see activity analysis.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Filter for human users in charts by default
   const humanUsers = useMemo(() => {
     if (includeSystem) return users;
