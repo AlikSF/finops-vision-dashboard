@@ -131,10 +131,15 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
   // All users sorted
   const allSorted = useMemo(() => {
     const q = userSearch.toLowerCase();
-    return [...displayUsers]
-      .filter(u => !q || u.name.toLowerCase().includes(q) || u.profileName?.toLowerCase().includes(q) || u.roleName?.toLowerCase().includes(q))
-      .sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0));
-  }, [displayUsers, userSearch]);
+    const filtered = [...displayUsers]
+      .filter(u => !q || u.name.toLowerCase().includes(q) || u.profileName?.toLowerCase().includes(q) || u.roleName?.toLowerCase().includes(q));
+    if (statusSort === "asc") {
+      return filtered.sort((a, b) => (STATUS_ORDER[a.usageStatus] ?? 9) - (STATUS_ORDER[b.usageStatus] ?? 9));
+    } else if (statusSort === "desc") {
+      return filtered.sort((a, b) => (STATUS_ORDER[b.usageStatus] ?? 9) - (STATUS_ORDER[a.usageStatus] ?? 9));
+    }
+    return filtered.sort((a, b) => (b.logins30d ?? 0) - (a.logins30d ?? 0));
+  }, [displayUsers, userSearch, statusSort]);
 
   // Team breakdown table data
   const teamBreakdown = useMemo(() => {
