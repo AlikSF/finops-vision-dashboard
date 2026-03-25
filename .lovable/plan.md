@@ -1,50 +1,44 @@
 
 
-# Scaling the Dashboard for 31K Records (All License Types)
+# Dashboard Readability & Polish — Plan
 
-## Can It Handle It?
+## Problems Identified from Screenshot
 
-**Yes — with targeted optimizations.** The CSV parsing (PapaParse) and KPI calculations will work fine with 31K records. However, two bottlenecks need fixing:
+1. **Pie chart labels overlap badly** — With 20+ profiles, the inline labels stack on top of each other and are unreadable
+2. **Bar chart X-axis labels overlap** — Profile names are long ("Programme Manager (CSP)") and crowd together
+3. **KPI tiles cramped** — 6 tiles across on one row makes text small and hard to scan
+4. **Charts too short** — 280px height is insufficient for the data density
+5. **No visual breathing room** — Everything is packed tightly
 
-1. **localStorage has a ~5MB limit** — 31K records as JSON will be ~15-20MB and will fail silently
-2. **The table renders ALL rows at once** — 31K DOM rows will freeze the browser
+## Changes
 
-## What Changes
+### 1. Fix Pie Chart (`Index.tsx` — Overview tab)
+- Remove inline labels entirely — they don't work with 20+ slices
+- Add a scrollable legend list beside the pie instead (two-column layout: pie left, legend right)
+- Show top 8 profiles in the pie, group the rest as "Other"
+- Use Recharts `Tooltip` for detail on hover
 
-### 1. Replace localStorage with IndexedDB
-Switch from `localStorage` to **IndexedDB** (via the `idb-keyval` library — tiny, promise-based). IndexedDB can store hundreds of MB with no issues.
+### 2. Fix Bar Charts (`Index.tsx` — all tabs)
+- Increase chart height from 280px to 380px
+- For Overview "Activity by Profile" bar chart: switch to **horizontal layout** (`layout="vertical"`) so long profile names display properly on the Y-axis
+- Add `tick={{ fontSize: 11 }}` to axes for readability
+- Limit to top 10 profiles by user count, group rest as "Other"
 
-**File**: `src/hooks/useUploadedData.ts`
-- Replace `localStorage.getItem/setItem` with `idb-keyval` `get/set/del`
-- Same API surface, just async storage
+### 3. Improve KPI Tiles Layout
+- Change grid from `xl:grid-cols-6` to `lg:grid-cols-3 xl:grid-cols-3` — show 3 per row (2 rows of 3)
+- Increase font size of values from `text-2xl` to `text-3xl`
+- Add more padding inside cards
 
-### 2. Add Table Pagination
-Instead of rendering all 31K rows, paginate the table to show 50 rows per page with Previous/Next controls.
+### 4. Table Readability
+- Truncate long emails with `max-w-[200px] truncate`
+- Add alternating row backgrounds via `even:bg-muted/30`
+- Make table text slightly larger
 
-**File**: `src/pages/Index.tsx`
-- Add `currentPage` state
-- Slice `filteredUsers` for display: `filteredUsers.slice(page * 50, (page + 1) * 50)`
-- Add pagination controls below the table using shadcn Pagination component
-- Reset page to 0 when filters change
-
-### 3. License Type as a First-Class Dimension
-Community Portal licenses will naturally appear in the existing **License Name** filter and charts. The dashboard already groups by `licenseName` — so Community Portal, Salesforce, Platform, etc. will all show up automatically as distinct categories in:
-- The License Type filter dropdown
-- The Pie Chart (license distribution)
-- KPI calculations
-
-No schema changes needed — your CSV already has the `License Name` column mapped.
-
-### 4. Add Record Count Indicator
-Show "Showing X of Y records" above the table so users know the dataset size and filter impact.
+### 5. General Spacing
+- Increase gap between sections from `mb-6` to `mb-8`
+- Add subtle card shadows for depth
+- Increase chart container heights consistently to 380px
 
 ## Files Modified
-1. `src/hooks/useUploadedData.ts` — IndexedDB storage
-2. `src/pages/Index.tsx` — table pagination + record count
-3. `package.json` — add `idb-keyval` dependency
-
-## What Stays the Same
-- All charts, KPIs, and filters work identically — they use `useMemo` over the full dataset
-- CSV parsing handles any license type automatically
-- Profile, Role, and License Age analysis all scale fine (aggregate computations)
+1. `src/pages/Index.tsx` — All visual changes above
 
