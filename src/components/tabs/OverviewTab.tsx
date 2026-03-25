@@ -17,8 +17,11 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ users, allUsers, licensePool }: OverviewTabProps) {
+  const safeUsers = users || [];
+  const safeAllUsers = allUsers || [];
+  
   // KPIs — exclude Automated/System & Integration/Technical from human usage metrics
-  const humanUsers = users.filter(u =>
+  const humanUsers = safeUsers.filter(u =>
     u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical"
   );
 
