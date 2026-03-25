@@ -11,15 +11,20 @@ function parseGeneric(csvText: string): Record<string, string>[] {
 }
 
 function findCol(row: Record<string, string>, ...candidates: string[]): string {
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[_\s.]+/g, "");
+  const rowKeys = Object.keys(row);
   for (const c of candidates) {
-    if (row[c] !== undefined) return row[c] || "";
+    const nc = normalize(c);
+    const match = rowKeys.find(k => normalize(k) === nc);
+    if (match !== undefined) return row[match] || "";
   }
   return "";
 }
 
 function hasCol(headers: string[], ...candidates: string[]): boolean {
-  const lower = headers.map(h => h.toLowerCase());
-  return candidates.some(c => lower.includes(c.toLowerCase()));
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/[_\s.]+/g, "");
+  const normalizedHeaders = headers.map(normalize);
+  return candidates.some(c => normalizedHeaders.includes(normalize(c)));
 }
 
 export function detectFileType(csvText: string): FileType | null {
