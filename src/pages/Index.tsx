@@ -80,12 +80,15 @@ function EmptyState() {
   );
 }
 
+const ROWS_PER_PAGE = 50;
+
 const Index = () => {
   const { users, uploadTimestamp, isProcessing, handleFileUpload, clearData } = useUploadedData();
   const [search, setSearch] = useState("");
   const [selectedProfile, setSelectedProfile] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedLicense, setSelectedLicense] = useState("all");
+  const [currentPage, setCurrentPage] = useState(0);
 
   const profiles = useMemo(() => getUniqueProfiles(users), [users]);
   const roles = useMemo(() => getUniqueRoles(users), [users]);
