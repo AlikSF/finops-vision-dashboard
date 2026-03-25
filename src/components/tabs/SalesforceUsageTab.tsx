@@ -35,6 +35,7 @@ interface Props {
 
 export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistory, hasLoginHistory }: Props) {
   const [includeSystem, setIncludeSystem] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   const safeUsers = users || [];
   const safeAll = allSfUsers || [];
