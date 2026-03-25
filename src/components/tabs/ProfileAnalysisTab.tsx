@@ -10,7 +10,6 @@ interface ProfileAnalysisTabProps {
 }
 
 export function ProfileAnalysisTab({ users }: ProfileAnalysisTabProps) {
-  // Profile summary
   const profileMap = new Map<string, { total: number; active: number; atRisk: number; ghost: number; neverUsed: number }>();
   users.forEach(u => {
     const p = u.profileName || "Unknown";
@@ -21,14 +20,18 @@ export function ProfileAnalysisTab({ users }: ProfileAnalysisTabProps) {
   });
 
   const profileData = Array.from(profileMap.entries())
-    .map(([name, v]) => ({ name, ...v }))
+    .map(([name, v]) => ({
+      name, ...v,
+      activeP: v.total > 0 ? Math.round((v.active / v.total) * 100) : 0,
+      ghostP: v.total > 0 ? Math.round((v.ghost / v.total) * 100) : 0,
+      neverP: v.total > 0 ? Math.round((v.neverUsed / v.total) * 100) : 0,
+    }))
     .sort((a, b) => b.total - a.total);
 
   const top10 = profileData.slice(0, 10);
 
   return (
     <div className="space-y-6">
-      {/* Bar chart */}
       {top10.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
@@ -51,7 +54,6 @@ export function ProfileAnalysisTab({ users }: ProfileAnalysisTabProps) {
         </Card>
       )}
 
-      {/* Full table */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">All Profiles Summary ({profileData.length})</CardTitle>
@@ -64,9 +66,12 @@ export function ProfileAnalysisTab({ users }: ProfileAnalysisTabProps) {
                   <TableHead>Profile</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Active</TableHead>
+                  <TableHead className="text-right">Active %</TableHead>
                   <TableHead className="text-right">At Risk</TableHead>
                   <TableHead className="text-right">Ghost</TableHead>
+                  <TableHead className="text-right">Ghost %</TableHead>
                   <TableHead className="text-right">Never Used</TableHead>
+                  <TableHead className="text-right">Never Used %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -75,9 +80,12 @@ export function ProfileAnalysisTab({ users }: ProfileAnalysisTabProps) {
                     <TableCell className="font-medium text-xs max-w-[250px] truncate">{p.name}</TableCell>
                     <TableCell className="text-right text-xs font-semibold">{p.total}</TableCell>
                     <TableCell className="text-right text-xs">{p.active}</TableCell>
+                    <TableCell className="text-right text-xs text-green-600">{p.activeP}%</TableCell>
                     <TableCell className="text-right text-xs">{p.atRisk}</TableCell>
                     <TableCell className="text-right text-xs">{p.ghost}</TableCell>
+                    <TableCell className="text-right text-xs text-destructive">{p.ghostP}%</TableCell>
                     <TableCell className="text-right text-xs">{p.neverUsed}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">{p.neverP}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell,
@@ -13,9 +14,10 @@ interface ActivityAnalysisTabProps {
   users: EnrichedUser[];
   loginHistory: LoginRecord[];
   hasLoginHistory: boolean;
+  includeSystem?: boolean;
 }
 
-export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: ActivityAnalysisTabProps) {
+export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory, includeSystem = false }: ActivityAnalysisTabProps) {
   if (!hasLoginHistory) {
     return (
       <Card className="shadow-sm">
@@ -26,7 +28,12 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: Ac
     );
   }
 
-  // Login activity buckets
+  // Filter for human users in charts by default
+  const humanUsers = useMemo(() => {
+    if (includeSystem) return users;
+    return users.filter(u => u.derivedCategory !== "Automated/System" && u.derivedCategory !== "Integration/Technical");
+  }, [users, includeSystem]);
+
   const activityBuckets = [
     { label: "7 days", key: "logins7d" as const },
     { label: "30 days", key: "logins30d" as const },
@@ -65,12 +72,11 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: Ac
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
-  // Top active users
-  const topUsers = [...users].sort((a, b) => b.logins90d - a.logins90d).slice(0, 10);
+  // Top active human users
+  const topUsers = [...humanUsers].sort((a, b) => b.logins90d - a.logins90d).slice(0, 10);
 
   return (
     <div className="space-y-6">
-      {/* Activity buckets */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">Login Activity Coverage</CardTitle>
@@ -90,7 +96,6 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: Ac
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Login Type */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Login Type Distribution</CardTitle>
@@ -120,7 +125,6 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: Ac
           </CardContent>
         </Card>
 
-        {/* Top Applications */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Top Applications</CardTitle>
@@ -139,10 +143,9 @@ export function ActivityAnalysisTab({ users, loginHistory, hasLoginHistory }: Ac
         </Card>
       </div>
 
-      {/* Top active users */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Most Active Users (90 days)</CardTitle>
+          <CardTitle className="text-sm font-semibold">Most Active Users (90 days) — Excludes System/Integration</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={380}>

@@ -5,6 +5,7 @@ import { CategoryRuleEditor } from "@/components/CategoryRuleEditor";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { useDataStore } from "@/hooks/useDataStore";
+import { ExecutiveSummaryStrip } from "@/components/ExecutiveSummaryStrip";
 import { SalesforceUsageTab } from "@/components/tabs/SalesforceUsageTab";
 import { CommunityUsageTab } from "@/components/tabs/CommunityUsageTab";
 import { LicenseUsageTab } from "@/components/tabs/LicenseUsageTab";
@@ -32,7 +33,7 @@ const Index = () => {
 
   // Pre-filter by tab
   const sfUsers = useMemo(
-    () => (enrichedUsers || []).filter(u => u.licenseName === "Salesforce" && !COMMUNITY_LICENSES.includes(u.licenseName)),
+    () => (enrichedUsers || []).filter(u => !COMMUNITY_LICENSES.includes(u.licenseName)),
     [enrichedUsers]
   );
   const communityUsers = useMemo(
@@ -120,6 +121,9 @@ const Index = () => {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Executive Summary Strip */}
+          <ExecutiveSummaryStrip users={enrichedUsers || []} pslPool={pslPool || []} />
+
           {/* Toolbar */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
