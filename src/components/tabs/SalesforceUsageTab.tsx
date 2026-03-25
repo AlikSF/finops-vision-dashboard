@@ -209,6 +209,9 @@ export function SalesforceUsageTab({ users, allSfUsers, licensePool, loginHistor
           )}
         </TabsContent>
 
+        <TabsContent value="insights">
+          <SalesforceInsightsTab users={displayUsers} />
+        </TabsContent>
         <TabsContent value="profile">
           <ProfileAnalysisTab users={displayUsers} />
         </TabsContent>
